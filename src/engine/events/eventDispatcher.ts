@@ -30,6 +30,13 @@ export type GameEventMap = {
   BRAWL_STARTED: { brawlId: string; instigatorId: string; affectedCount: number }
   BRAWLER_TAPPED: { brawlId: string; tapsReceived: number; tapsRequired: number }
   BRAWL_RESOLVED: { brawlId: string; byPlayer: boolean }
+
+  // MBW-97: Drunk escort
+  DRUNK_ESCORTED: { customerId: string; byPlayer: boolean }
+
+  // MBW-99/100: Mess events
+  MESS_SPAWNED: { messId: string; position: { x: number; y: number } }
+  MESS_CLEANED: { messId: string }
 }
 
 type EventHandler<T> = (payload: T) => void

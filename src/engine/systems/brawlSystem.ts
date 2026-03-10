@@ -149,6 +149,11 @@ class BrawlSystem {
     eventDispatcher.emit('BRAWL_RESOLVED', { brawlId, byPlayer })
   }
 
+  // MBW-88: Called by securitySystem when bouncer resolves a brawl — treated as player-resolved (no extra penalty)
+  securityResolve(brawlId: string): void {
+    this.resolveBrawl(brawlId, true)
+  }
+
   getBrawlForCustomer(customerId: string): BrawlEntity | undefined {
     return this.brawls.find(
       (b) => b.instigatorId === customerId || b.affectedCustomerIds.includes(customerId),

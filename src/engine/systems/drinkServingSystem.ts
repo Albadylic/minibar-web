@@ -7,6 +7,7 @@ import { customerSystem } from './customerSystem'
 import { barScene } from '../renderer/barScene'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { STAR_RATING } from '../../config/difficulty'
+import { CUSTOMER_CONFIGS } from '../../config/customers'
 
 class DrinkServingSystem {
   // MBW-26: Toggle drink selection on tap click
@@ -19,11 +20,21 @@ class DrinkServingSystem {
 
   // MBW-27: Attempt serve when customer is clicked with a drink selected
   private handleCustomerClicked = ({ customerId }: { customerId: string }): void => {
+    const customer = customerSystem.getCustomer(customerId)
+    if (!customer) return
+
+    // MBW-95: Drunk customer — player taps to escort out (no drink needed)
+    if (!customer.canBeServed) {
+      if (customer.status === 'WAITING') {
+        customerSystem.escortDrunk(customerId)
+        eventDispatcher.emit('DRUNK_ESCORTED', { customerId, byPlayer: true })
+      }
+      return
+    }
+
     const selectedDrinkId = gameLoop.selectedDrink
     if (!selectedDrinkId) return
-
-    const customer = customerSystem.getCustomer(customerId)
-    if (!customer || customer.status !== 'WAITING') return
+    if (customer.status !== 'WAITING') return
 
     // Always clear selection after a serve attempt
     gameLoop.selectDrink(null)
@@ -33,9 +44,9 @@ class DrinkServingSystem {
     const isCorrect = customer.drinkOrder === selectedDrinkId
 
     if (isCorrect) {
-      // MBW-28: Award coins (+ tip jar bonus on fast serves — MBW-41)
+      // MBW-28/91: Award coins with type multiplier (rich = 1.8×) + tip jar on fast serves
       const isFastServe = customer.patienceTimer / customer.patienceMax > 0.5
-      const coins = (drink?.coinReward ?? 0) + (isFastServe ? gameLoop.tipJarBonus : 0)
+      const coins = Math.round((drink?.coinReward ?? 0) * customer.coinMultiplier) + (isFastServe ? gameLoop.tipJarBonus : 0)
       gameLoop.addCoins(coins)
 
       // Star rating gain — skill bonus if patience still > 50%
@@ -53,8 +64,10 @@ class DrinkServingSystem {
         coinsEarned: coins,
       })
     } else {
-      // Wrong drink — star loss, customer leaves
-      const isGameOver = gameLoop.adjustStarRating(-STAR_RATING.lossPerWrongDrink)
+      // MBW-94: Rich customers cause a harsher rating hit when served wrong drink
+      const config = CUSTOMER_CONFIGS[customer.type]
+      const starLoss = config.harshReview ? STAR_RATING.lossPerHarshReview : STAR_RATING.lossPerWrongDrink
+      const isGameOver = gameLoop.adjustStarRating(-starLoss)
       gameLoop.recordWrongDrink()
       customerSystem.wrongDrink(customerId)
 

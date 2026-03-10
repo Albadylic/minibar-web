@@ -50,9 +50,17 @@ export const STAR_RATING = {
   max: 5.0,
   gameOverThreshold: 1.0,
   gainPerCorrectServe: 0.05,
-  skillBonusGain: 0.02, // extra gain when serve is fast (patience > 50% remaining)
-  lossPerBadReview: 0.15, // unserved customer leaves
+  skillBonusGain: 0.02,      // extra gain when serve is fast (patience > 50% remaining)
+  lossPerBadReview: 0.15,    // unserved customer leaves
   lossPerWrongDrink: 0.1,
+  lossPerHarshReview: 0.28,  // MBW-94: rich customer leaves unhappy — significantly worse
+} as const
+
+// MBW-99: Mess spawning — probability per DRINK_SERVED or CUSTOMER_LEFT event
+export const MESS = {
+  spawnChancePerServe: 0.25,  // 25% chance a mess spawns after each successful serve
+  spawnChanceOnLeave: 0.15,   // 15% chance a mess spawns when customer leaves
+  maxMesses: 8,               // cap to avoid screen clutter
 } as const
 
 // Coin rewards per drink tier

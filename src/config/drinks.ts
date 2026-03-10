@@ -1,5 +1,5 @@
 // All drink definitions — V1.0 has 6 drinks (Tier 1 + Tier 2)
-// Tier 3 drinks (Whisky, Brandy, Champagne) added in V2.0+
+// MBW-102: Brandy and Champagne (Tier 3) added in V2.5
 
 export interface DrinkConfig {
   id: string
@@ -9,8 +9,8 @@ export interface DrinkConfig {
   coinReward: number
   placeholderColor: number // hex color for placeholder circle
   customerAffinities: {
-    normal: number // 0–1 weight
-    // hooligan, rich, drunk added in later versions
+    normal: number   // 0–1 weight for NORMAL customers
+    rich?: number    // MBW-91: optional affinity for RICH customers
   }
 }
 
@@ -67,7 +67,26 @@ export const DRINKS: DrinkConfig[] = [
     unlockDay: 13,
     coinReward: 8,
     placeholderColor: 0x8b1a3a,
-    customerAffinities: { normal: 0.6 },
+    customerAffinities: { normal: 0.6, rich: 1.0 },
+  },
+  // MBW-102: Tier 3 drinks — high value, favoured by rich clientele
+  {
+    id: 'brandy',
+    name: 'Brandy',
+    tier: 3,
+    unlockDay: 18,
+    coinReward: 12,
+    placeholderColor: 0x8b3a0a,
+    customerAffinities: { normal: 0.4, rich: 1.2 },
+  },
+  {
+    id: 'champagne',
+    name: 'Champagne',
+    tier: 3,
+    unlockDay: 21,
+    coinReward: 15,
+    placeholderColor: 0xf0e68c,
+    customerAffinities: { normal: 0.3, rich: 1.5 },
   },
 ]
 

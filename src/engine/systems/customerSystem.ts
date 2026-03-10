@@ -105,18 +105,22 @@ class CustomerSystem {
     this.spawnCustomer(availableSeat.id, availableSeat.position, unlockedDrinks, dayConfig.modifiers.patienceMultiplier, customerType)
   }
 
-  // MBW-74: Weighted random selection between NORMAL and HOOLIGAN
-  // Also gates on preferredPhases — hooligan won't spawn in Afternoon even if weight > 0
+  // MBW-74/91/95: Weighted random selection across all customer types
+  // Phase gates: hooligans won't spawn in Afternoon; rich won't spawn at Night
   private rollCustomerType(
     weights: DayConfig['customerWeights'],
     phase: DayPhase,
   ): CustomerType {
-    const hooliganConfig = CUSTOMER_CONFIGS.HOOLIGAN
-    const hooliganAllowed = hooliganConfig.preferredPhases.includes(phase)
-    const effectiveHooliganWeight = hooliganAllowed ? weights.hooligan : 0
-    const total = weights.normal + effectiveHooliganWeight
-    if (total === 0 || effectiveHooliganWeight === 0) return 'NORMAL'
-    return Math.random() < effectiveHooliganWeight / total ? 'HOOLIGAN' : 'NORMAL'
+    const effectiveHooligan = CUSTOMER_CONFIGS.HOOLIGAN.preferredPhases.includes(phase) ? weights.hooligan : 0
+    const effectiveRich = CUSTOMER_CONFIGS.RICH.preferredPhases.includes(phase) ? (weights.rich ?? 0) : 0
+    const effectiveDrunk = weights.drunk ?? 0
+    const total = weights.normal + effectiveHooligan + effectiveRich + effectiveDrunk
+    if (total === 0) return 'NORMAL'
+    const r = Math.random() * total
+    if (r < weights.normal) return 'NORMAL'
+    if (r < weights.normal + effectiveHooligan) return 'HOOLIGAN'
+    if (r < weights.normal + effectiveHooligan + effectiveRich) return 'RICH'
+    return 'DRUNK'
   }
 
   private pickAvailableSeat(): (typeof SEATS)[number] | null {
@@ -156,6 +160,8 @@ class CustomerSystem {
       drinksServed: 0,
       willReorder: false,
       canBrawl: config.canBrawl,
+      canBeServed: config.canBeServed,
+      coinMultiplier: config.coinMultiplier,
     }
 
     this.occupiedSeatIds.add(seatId)
@@ -234,11 +240,9 @@ class CustomerSystem {
     if (customer.lingerTimer <= 0) {
       if (customer.willReorder) {
         // MBW-56: Use unlocked drinks, not the full DRINKS_BY_ID set
+        const config = CUSTOMER_CONFIGS[customer.type]
         customer.drinkOrder = this.rollDrinkOrder(this.unlockedDrinks)
-        customer.patienceTimer = randomInRange(
-          CUSTOMER_CONFIGS.NORMAL.patience.min,
-          CUSTOMER_CONFIGS.NORMAL.patience.max,
-        )
+        customer.patienceTimer = randomInRange(config.patience.min, config.patience.max)
         customer.patienceMax = customer.patienceTimer
         customer.status = 'REORDERING'
       } else {
@@ -305,19 +309,24 @@ class CustomerSystem {
   serveCustomer(customerId: string): boolean {
     const customer = this.customers.find((c) => c.id === customerId)
     if (!customer || customer.status !== 'WAITING') return false
+    const config = CUSTOMER_CONFIGS[customer.type]
 
     customer.drinksServed++
-    customer.willReorder = Math.random() < CUSTOMER_CONFIGS.NORMAL.reorderChance
-    customer.lingerTimer = randomInRange(
-      CUSTOMER_CONFIGS.NORMAL.linger.min,
-      CUSTOMER_CONFIGS.NORMAL.linger.max,
-    )
+    customer.willReorder = Math.random() < config.reorderChance
+    customer.lingerTimer = randomInRange(config.linger.min, config.linger.max)
     customer.status = 'SERVED_LINGERING'
     return true
   }
 
   // Called by serving system on wrong drink — customer leaves immediately
   wrongDrink(customerId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    this.startLeaving(customer)
+  }
+
+  // MBW-95: Called by player tap or security to remove a drunk customer
+  escortDrunk(customerId: string): void {
     const customer = this.customers.find((c) => c.id === customerId)
     if (!customer) return
     this.startLeaving(customer)

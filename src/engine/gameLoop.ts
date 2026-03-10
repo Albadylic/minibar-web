@@ -21,7 +21,10 @@ import { UPGRADES_BY_ID } from '../config/upgrades'
 import { useDayResultStore } from '../store/dayResultStore'
 import { GAME_DAY_CONFIG } from '../config/events'
 import { brawlSystem } from './systems/brawlSystem'
+import { securitySystem } from './systems/securitySystem'
+import { cleaningSystem } from './systems/cleaningSystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
+import type { EventType } from '../types/day'
 
 // MBW-10/41/51/83: Generate DayConfig from current save — applies owned upgrade effects + day scaling
 // event is determined externally (ShopScreen rolls it) and passed in here
@@ -32,6 +35,8 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
 
   let patienceMultiplier = dayPatienceMult
   let tipJarBonus = 0
+  let prestigePoints = 0
+  let hooliganReductionMult = 1.0
 
   for (const [upgradeId, owned] of Object.entries(save.upgrades)) {
     const config = UPGRADES_BY_ID[upgradeId]
@@ -43,15 +48,29 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
         patienceMultiplier *= effect.value
       } else if (effect.type === 'tip_jar') {
         tipJarBonus += effect.value
+      } else if (effect.type === 'prestige') {
+        prestigePoints += effect.value
+      } else if (effect.type === 'reduce_hooligan_spawn') {
+        hooliganReductionMult *= effect.value
       }
       // extra_capacity is applied to barCapacity in GameSave at purchase time
     }
   }
 
+  // MBW-93: Rich weight scales with prestige upgrades owned
+  const richWeight = prestigePoints * 0.05
+  // MBW-95: Drunks appear at low rate after Day 5
+  const drunkWeight = save.dayNumber >= 5 ? 0.05 : 0
+
   // MBW-74: Customer type weights — hooligans only spawn on Game Days
   const customerWeights = event === 'GAME_DAY'
-    ? { normal: GAME_DAY_CONFIG.customerWeights.normal, hooligan: GAME_DAY_CONFIG.customerWeights.hooligan }
-    : { normal: 1.0, hooligan: 0 }
+    ? {
+        normal: GAME_DAY_CONFIG.customerWeights.normal,
+        hooligan: GAME_DAY_CONFIG.customerWeights.hooligan * hooliganReductionMult,
+        rich: richWeight,
+        drunk: drunkWeight,
+      }
+    : { normal: 1.0, hooligan: 0, rich: richWeight, drunk: drunkWeight }
 
   return {
     dayNumber: save.dayNumber,
@@ -203,6 +222,10 @@ class GameLoop {
 
     // MBW-78/80: Update brawl system
     brawlSystem.update(dt)
+    // MBW-88/89: Update security system (brawl auto-resolve, drunk escort)
+    securitySystem.update(dt)
+    // MBW-101: Update cleaner NPC pathfinding
+    cleaningSystem.tick(dt)
 
     useHudStore.setState({
       timeRemaining,

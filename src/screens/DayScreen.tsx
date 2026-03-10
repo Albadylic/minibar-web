@@ -13,7 +13,10 @@ import { customerRenderer } from '../engine/renderer/customerRenderer'
 import { flyupRenderer } from '../engine/renderer/flyupRenderer'
 import { drinkServingSystem } from '../engine/systems/drinkServingSystem'
 import { brawlSystem } from '../engine/systems/brawlSystem'
+import { securitySystem } from '../engine/systems/securitySystem'
+import { cleaningSystem } from '../engine/systems/cleaningSystem'
 import { getUnlockedDrinks } from '../config/drinks'
+import { UPGRADES_BY_ID } from '../config/upgrades'
 
 export function DayScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -35,11 +38,14 @@ export function DayScreen() {
     const dayConfig = generateDayConfig(save, pendingEvent)
     gameLoop.start(dayConfig, save.coins, save.starRating, unlockedDrinks)
     brawlSystem.init(save.dayNumber)
+    const bouncerTier = (save.upgrades['bouncer']?.tier ?? 0) as 0 | 1 | 2
+    securitySystem.init(bouncerTier)
     drinkServingSystem.init()
 
     return () => {
       drinkServingSystem.destroy()
       brawlSystem.destroy()
+      securitySystem.destroy()
       gameLoop.stop()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,16 +66,26 @@ export function DayScreen() {
 
     const ownedUpgrades = Object.keys(save.upgrades)
 
+    // MBW-101: Cleaner speed from owned upgrade (null = no cleaner NPC)
+    const cleanerUpgradeTier = save.upgrades['cleaner']
+      ? UPGRADES_BY_ID['cleaner']?.tiers[(save.upgrades['cleaner']?.tier ?? 1) - 1]
+      : null
+    const cleanerSpeed = cleanerUpgradeTier
+      ? (cleanerUpgradeTier.effects.find((e) => e.type === 'cleaner')?.value ?? null)
+      : null
+
     pixiApp.init(canvas).then(() => {
       if (cancelled || !pixiApp.app) return
       barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades)
       customerRenderer.init(pixiApp.app)
       flyupRenderer.init(pixiApp.app) // MBW-67
+      cleaningSystem.init(pixiApp.app, cleanerSpeed) // MBW-101
     })
 
     return () => {
       cancelled = true
       flyupRenderer.destroy()
+      cleaningSystem.destroy()
       customerRenderer.destroy()
       barScene.destroy()
       pixiApp.destroy()

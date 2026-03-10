@@ -32,9 +32,11 @@ export interface DayConfig {
     coinMultiplier: number // 1.0 = default
     tipJarBonus: number // coins added on fast serves (0 = no tip jar)
   }
-  // MBW-74: Relative spawn weights per customer type (0 = never spawns)
+  // MBW-74/91/95: Relative spawn weights per customer type (0 = never spawns)
   customerWeights: {
     normal: number
     hooligan: number
+    rich: number    // MBW-93: scales with prestige upgrades owned
+    drunk: number   // MBW-95: low constant after Day 5
   }
 }

@@ -1,6 +1,7 @@
 // MBW-17: CustomerEntity model
 // MBW-72: HOOLIGAN type added for V2.0 Game Day mechanic
-export type CustomerType = 'NORMAL' | 'HOOLIGAN' // V2.5+ adds RICH, DRUNK
+// MBW-91/95: RICH and DRUNK types added for V2.5
+export type CustomerType = 'NORMAL' | 'HOOLIGAN' | 'RICH' | 'DRUNK'
 
 export type CustomerSkin = 'priest' | 'farmer' | 'blacksmith' | 'merchant'
 
@@ -27,6 +28,8 @@ export interface CustomerEntity {
   drinksServed: number    // how many times served this visit
   willReorder: boolean    // pre-rolled on serve — determines behaviour after linger
   canBrawl: boolean       // MBW-72: copied from CustomerTypeConfig at spawn
+  canBeServed: boolean    // MBW-95: false for DRUNK — can't be given a drink
+  coinMultiplier: number  // MBW-91: multiplier on drink coin reward (1.8× for RICH)
 }
 
 let _nextId = 0
