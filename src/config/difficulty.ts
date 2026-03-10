@@ -1,11 +1,13 @@
 // All balance values live here — never hardcode in logic files
 
-// MBW-8: Base customer arrival rates (customers per second) per phase — day 1 baseline
+// MBW-55: Base customer arrival rates (customers per second) per phase — day 1 baseline
+// Reduced from original values (0.25/0.4/0.6/0.8) — Day 1 was overwhelming for new players.
+// +5%/day scaling means Day 5 reaches roughly the old Day-1 morning rate.
 export const BASE_ARRIVAL_RATES = {
-  morning: 0.25, // ~1 customer every 4s
-  afternoon: 0.4, // ~1 customer every 2.5s
-  evening: 0.6, // ~1 customer every 1.7s
-  night: 0.8, // ~1 customer every 1.25s
+  morning: 0.15, // ~1 every 7s — gentle learning pace
+  afternoon: 0.25, // ~1 every 4s  — warming up
+  evening: 0.4, // ~1 every 2.5s — busy
+  night: 0.55, // ~1 every 1.8s — hectic but manageable
 } as const
 
 // MBW-51: Arrival rate scaling per day (linear ramp, capped at day 20)

@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
@@ -6,8 +5,6 @@ import { App } from './App'
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Root element not found')
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// StrictMode intentionally omitted — it double-invokes effects in dev, which
+// causes two PixiJS Applications to race for the same WebGL canvas context.
+createRoot(rootElement).render(<App />)

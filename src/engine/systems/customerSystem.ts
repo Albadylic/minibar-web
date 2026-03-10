@@ -9,7 +9,6 @@ import type { DayPhase } from '../../types/day'
 import type { DayConfig } from '../../types/day'
 import { CUSTOMER_CONFIGS, randomSkin, randomInRange } from '../../config/customers'
 import { SEATS, DOORWAY } from '../../config/barLayout'
-import { DRINKS_BY_ID } from '../../config/drinks'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { STAR_RATING } from '../../config/difficulty'
@@ -18,11 +17,14 @@ class CustomerSystem {
   customers: CustomerEntity[] = []
   private occupiedSeatIds = new Set<string>()
   private timeSinceLastSpawn = 0
+  // MBW-56: Store unlocked drinks so reorders stay within unlocked set
+  private unlockedDrinks: string[] = []
 
   reset(): void {
     this.customers = []
     this.occupiedSeatIds.clear()
     this.timeSinceLastSpawn = 0
+    this.unlockedDrinks = []
     resetCustomerIdCounter()
   }
 
@@ -34,6 +36,9 @@ class CustomerSystem {
     isLastOrders: boolean,
     unlockedDrinks: string[],
   ): void {
+    // MBW-56: Keep unlocked drinks in sync so reorders use the correct set
+    this.unlockedDrinks = unlockedDrinks
+
     // MBW-18: Spawn
     if (!isLastOrders) {
       this.updateSpawning(dt, dayConfig, phase, unlockedDrinks)
@@ -175,8 +180,8 @@ class CustomerSystem {
     customer.lingerTimer -= dt
     if (customer.lingerTimer <= 0) {
       if (customer.willReorder) {
-        const allDrinkIds = Object.keys(DRINKS_BY_ID)
-        customer.drinkOrder = this.rollDrinkOrder(allDrinkIds)
+        // MBW-56: Use unlocked drinks, not the full DRINKS_BY_ID set
+        customer.drinkOrder = this.rollDrinkOrder(this.unlockedDrinks)
         customer.patienceTimer = randomInRange(
           CUSTOMER_CONFIGS.NORMAL.patience.min,
           CUSTOMER_CONFIGS.NORMAL.patience.max,
