@@ -55,6 +55,7 @@ class DrinkServingSystem {
     } else {
       // Wrong drink — star loss, customer leaves
       const isGameOver = gameLoop.adjustStarRating(-STAR_RATING.lossPerWrongDrink)
+      gameLoop.recordWrongDrink()
       customerSystem.wrongDrink(customerId)
 
       eventDispatcher.emit('WRONG_DRINK', { customerId, drinkId: selectedDrinkId })

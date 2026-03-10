@@ -17,6 +17,7 @@ import {
 import type { GameSave } from '../types/game'
 import { BASE_ARRIVAL_RATES, STAR_RATING, getArrivalRateMultiplier, getPatienceMultiplierForDay } from '../config/difficulty'
 import { UPGRADES_BY_ID } from '../config/upgrades'
+import { useDayResultStore } from '../store/dayResultStore'
 
 // MBW-10/41/51: Generate DayConfig from current save — applies owned upgrade effects + day scaling
 export function generateDayConfig(save: GameSave): DayConfig {
@@ -83,8 +84,10 @@ class GameLoop {
   private coins = 0
   private startCoins = 0
   private starRating = 3.0
+  private startStarRating = 3.0
   private selectedDrinkId: string | null = null
   private customersServed = 0
+  private wrongDrinks = 0
   private unlockedDrinks: string[] = []
 
   // MBW-10: Start the day — called by DayScreen on mount
@@ -104,8 +107,10 @@ class GameLoop {
     this.coins = initialCoins
     this.startCoins = initialCoins
     this.starRating = initialStarRating
+    this.startStarRating = initialStarRating
     this.selectedDrinkId = null
     this.customersServed = 0
+    this.wrongDrinks = 0
     this.unlockedDrinks = unlockedDrinks
     this.accumulator = 0
 
@@ -201,6 +206,7 @@ class GameLoop {
   // MBW-10: Commit results, save, transition to shop
   private endDay(): void {
     const coinsEarned = this.coins - this.startCoins
+    const starRatingDelta = this.starRating - this.startStarRating
 
     eventDispatcher.emit('DAY_ENDED', {
       coinsEarned,
@@ -218,7 +224,18 @@ class GameLoop {
         totalDaysPlayed: gameSave.stats.totalDaysPlayed + 1,
         totalCustomersServed: gameSave.stats.totalCustomersServed + this.customersServed,
         totalCoinsEarned: gameSave.stats.totalCoinsEarned + Math.max(0, coinsEarned),
+        totalWrongDrinks: gameSave.stats.totalWrongDrinks + this.wrongDrinks,
       },
+    })
+
+    // MBW-59/60: Snapshot day result so ShopScreen can select and display a review
+    useDayResultStore.getState().setResult({
+      dayNumber: gameSave.dayNumber,
+      customersServed: this.customersServed,
+      wrongDrinks: this.wrongDrinks,
+      coinsEarned: Math.max(0, coinsEarned),
+      starRatingDelta,
+      finalRating: this.starRating,
     })
 
     this.stop()
@@ -244,6 +261,10 @@ class GameLoop {
 
   recordCustomerServed(): void {
     this.customersServed++
+  }
+
+  recordWrongDrink(): void {
+    this.wrongDrinks++
   }
 
   triggerGameOver(): void {

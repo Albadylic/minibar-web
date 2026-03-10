@@ -1,3 +1,13 @@
+/* MBW-12: Wrapper that holds the fixed 375×667 game and is CSS-scaled to fit any viewport.
+   transform-origin center means scaling shrinks/grows from the middle of the element.
+   width/height fix the layout box so transform doesn't collapse it. */
+.viewport-scaler {
+  width: 375px;
+  height: 667px;
+  transform-origin: center center;
+  flex-shrink: 0;
+}
+
 /* Game canvas container — 375×667 logical resolution, CSS-scaled with letterboxing */
 .game-container {
   position: relative;
@@ -92,6 +102,43 @@
 
 .hud-coins {
   color: #ffd700;
+}
+
+/* MBW-61: Yelp-style customer review card */
+.review-card {
+  width: 320px;
+  background: rgba(92, 61, 17, 0.35);
+  border: 1px solid #8b6331;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.review-name {
+  font-size: 0.8rem;
+  color: #b89060;
+  font-style: italic;
+}
+
+.review-stars {
+  font-size: 0.85rem;
+  color: #ffd700;
+  letter-spacing: 1px;
+}
+
+.review-text {
+  font-size: 0.8rem;
+  color: #e8d5b0;
+  line-height: 1.4;
+  font-style: italic;
 }
 
 /* Shop screen */

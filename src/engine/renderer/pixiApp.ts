@@ -17,6 +17,10 @@ class PixiAppManager {
       antialias: false,
       // Disable auto-ticker — our game loop drives rendering manually
       autoStart: false,
+      // MBW-12: Render at device pixel ratio for sharp output on retina displays.
+      // autoDensity keeps canvas CSS size at 375×667 regardless of resolution.
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
     })
     this.app = app
   }
