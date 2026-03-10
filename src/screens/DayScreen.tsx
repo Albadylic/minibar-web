@@ -3,14 +3,16 @@
 // MBW-13/15/16: Bar scene
 // MBW-26/27/28: Drink serving system
 // MBW-30: Drink unlock progression
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useHudStore } from '../store/hudStore'
 import { gameLoop, generateDayConfig } from '../engine/gameLoop'
 import { pixiApp } from '../engine/renderer/pixiApp'
 import { barScene } from '../engine/renderer/barScene'
 import { customerRenderer } from '../engine/renderer/customerRenderer'
+import { flyupRenderer } from '../engine/renderer/flyupRenderer'
 import { drinkServingSystem } from '../engine/systems/drinkServingSystem'
+import { brawlSystem } from '../engine/systems/brawlSystem'
 import { getUnlockedDrinks } from '../config/drinks'
 
 export function DayScreen() {
@@ -19,7 +21,7 @@ export function DayScreen() {
 
   // Start game loop on mount — also handles drink unlock check (MBW-30)
   useEffect(() => {
-    const { gameSave: save, updateSave: update } = useGameStore.getState()
+    const { gameSave: save, updateSave: update, pendingEvent } = useGameStore.getState()
 
     // MBW-30: Compute all drinks unlocked by this day number
     const allUnlocked = getUnlockedDrinks(save.dayNumber).map((d) => d.id)
@@ -29,12 +31,15 @@ export function DayScreen() {
     }
     const unlockedDrinks = hasNewDrinks ? allUnlocked : save.unlockedDrinks
 
-    const dayConfig = generateDayConfig(save)
+    // MBW-83: pendingEvent was rolled in ShopScreen; pass it to DayConfig
+    const dayConfig = generateDayConfig(save, pendingEvent)
     gameLoop.start(dayConfig, save.coins, save.starRating, unlockedDrinks)
+    brawlSystem.init(save.dayNumber)
     drinkServingSystem.init()
 
     return () => {
       drinkServingSystem.destroy()
+      brawlSystem.destroy()
       gameLoop.stop()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,10 +64,12 @@ export function DayScreen() {
       if (cancelled || !pixiApp.app) return
       barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades)
       customerRenderer.init(pixiApp.app)
+      flyupRenderer.init(pixiApp.app) // MBW-67
     })
 
     return () => {
       cancelled = true
+      flyupRenderer.destroy()
       customerRenderer.destroy()
       barScene.destroy()
       pixiApp.destroy()
@@ -83,11 +90,23 @@ export function DayScreen() {
   )
 }
 
-// MBW-37: Color-coded star rating display
+// MBW-37/66: Color-coded star rating display with gain/loss animation
 function StarRating({ rating }: { rating: number }) {
+  const [animClass, setAnimClass] = useState('')
+  const prevRating = useRef(rating)
+
+  useEffect(() => {
+    if (rating === prevRating.current) return
+    const gained = rating > prevRating.current
+    prevRating.current = rating
+    setAnimClass(gained ? 'star-gain' : 'star-loss')
+    const t = setTimeout(() => setAnimClass(''), 400)
+    return () => clearTimeout(t)
+  }, [rating])
+
   const color = rating > 3 ? '#44cc44' : rating >= 2 ? '#ddcc00' : '#cc2222'
   return (
-    <span className="hud-stars" style={{ color }}>
+    <span className={`hud-stars ${animClass}`} style={{ color }}>
       ★ {rating.toFixed(1)}
     </span>
   )

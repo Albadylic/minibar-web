@@ -1,4 +1,5 @@
 // MBW-20: Customer sprite rendering + click/tap detection
+// MBW-80: BRAWLING state — hooligan is tappable, shows eject progress bar
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import type { CustomerEntity } from '../../entities/customer'
@@ -6,6 +7,7 @@ import { CUSTOMER_CONFIGS } from '../../config/customers'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { barScene } from './barScene'
 import { eventDispatcher } from '../events/eventDispatcher'
+import { brawlSystem } from '../systems/brawlSystem'
 
 const BODY_RADIUS = 14
 const PATIENCE_BAR_WIDTH = 32
@@ -17,6 +19,8 @@ interface CustomerDisplayObjects {
   drinkIndicator: Graphics
   patienceBarBg: Graphics
   patienceBar: Graphics
+  ejectBarBg: Graphics   // MBW-80: brawl eject progress bar
+  ejectBar: Graphics
   label: Text
 }
 
@@ -90,6 +94,17 @@ class CustomerRenderer {
     patienceBar.position.set(-PATIENCE_BAR_WIDTH / 2, -BODY_RADIUS - 20)
     root.addChild(patienceBar)
 
+    // MBW-80: Eject progress bar (shown during BRAWLING state)
+    const ejectBarBg = new Graphics()
+    ejectBarBg.position.set(-PATIENCE_BAR_WIDTH / 2, -BODY_RADIUS - 20)
+    ejectBarBg.visible = false
+    root.addChild(ejectBarBg)
+
+    const ejectBar = new Graphics()
+    ejectBar.position.set(-PATIENCE_BAR_WIDTH / 2, -BODY_RADIUS - 20)
+    ejectBar.visible = false
+    root.addChild(ejectBar)
+
     // Skin name label (small, for placeholder clarity)
     const label = new Text({ text: customer.skin[0]!.toUpperCase(), style: labelStyle })
     label.anchor.set(0.5)
@@ -97,23 +112,24 @@ class CustomerRenderer {
     root.addChild(label)
 
     this.stage!.addChild(root)
-    return { root, body, drinkIndicator, patienceBarBg, patienceBar, label }
+    return { root, body, drinkIndicator, patienceBarBg, patienceBar, ejectBarBg, ejectBar, label }
   }
 
   private updateDisplay(display: CustomerDisplayObjects, customer: CustomerEntity): void {
-    const { root, body, drinkIndicator, patienceBarBg, patienceBar } = display
+    const { root, body, drinkIndicator, patienceBarBg, patienceBar, ejectBarBg, ejectBar } = display
 
     // Position
     root.position.set(customer.position.x, customer.position.y)
 
-    // Body color from skin config
-    const bodyColor = CUSTOMER_CONFIGS.NORMAL.placeholderColors[customer.skin]
+    // Body color — use type-specific config (hooligan red vs normal skin colors)
+    const config = CUSTOMER_CONFIGS[customer.type]
+    const bodyColor = config.placeholderColors[customer.skin]
     body.clear()
     body.circle(0, 0, BODY_RADIUS)
     body.fill({ color: bodyColor })
 
-    // Clickable only when WAITING
-    root.eventMode = customer.status === 'WAITING' ? 'static' : 'none'
+    // Clickable when WAITING (serve) or BRAWLING (tap to eject)
+    root.eventMode = (customer.status === 'WAITING' || customer.status === 'BRAWLING') ? 'static' : 'none'
 
     // Drink order indicator — show when WAITING or REORDERING
     const showDrinkOrder = customer.status === 'WAITING' || customer.status === 'REORDERING'
@@ -143,6 +159,27 @@ class CustomerRenderer {
       if (fillWidth > 0) {
         patienceBar.rect(0, 0, fillWidth, PATIENCE_BAR_HEIGHT)
         patienceBar.fill({ color: barColor })
+      }
+    }
+
+    // MBW-80: Eject progress bar — visible only for the brawl instigator when BRAWLING
+    const isBrawling = customer.status === 'BRAWLING'
+    ejectBarBg.visible = isBrawling
+    ejectBar.visible = isBrawling
+
+    if (isBrawling) {
+      const brawl = brawlSystem.getBrawlForCustomer(customer.id)
+      const progress = (brawl?.instigatorId === customer.id) ? brawl.ejectProgress : 0
+      const fillWidth = PATIENCE_BAR_WIDTH * progress
+
+      ejectBarBg.clear()
+      ejectBarBg.rect(0, 0, PATIENCE_BAR_WIDTH, PATIENCE_BAR_HEIGHT)
+      ejectBarBg.fill({ color: 0x440000 })
+
+      ejectBar.clear()
+      if (fillWidth > 0) {
+        ejectBar.rect(0, 0, fillWidth, PATIENCE_BAR_HEIGHT)
+        ejectBar.fill({ color: 0xff6600 })
       }
     }
 

@@ -104,6 +104,70 @@
   color: #ffd700;
 }
 
+/* MBW-84: Game Day notice screen */
+.game-day-notice {
+  gap: 12px;
+}
+
+.notice-banner {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #ffd700;
+  letter-spacing: 2px;
+  border: 2px solid #ffd700;
+  padding: 6px 24px;
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.notice-flavour {
+  font-size: 0.9rem;
+  color: #e8d5b0;
+  text-align: center;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.notice-tips {
+  list-style: none;
+  font-size: 0.8rem;
+  color: #b89060;
+  line-height: 1.8;
+  text-align: left;
+  padding: 0;
+}
+
+.notice-tips li::before {
+  content: '▸ ';
+  color: #ffd700;
+}
+
+/* MBW-66: Star rating transition animations */
+@keyframes star-gain {
+  0%   { transform: scale(1);   filter: brightness(1); }
+  40%  { transform: scale(1.5); filter: brightness(2.2); }
+  100% { transform: scale(1);   filter: brightness(1); }
+}
+
+@keyframes star-loss {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-4px); }
+  40%  { transform: translateX(4px); }
+  60%  { transform: translateX(-3px); }
+  80%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+.hud-stars.star-gain {
+  animation: star-gain 0.35s ease-out;
+  display: inline-block;
+}
+
+.hud-stars.star-loss {
+  animation: star-loss 0.35s ease-out;
+  display: inline-block;
+  color: #cc2222 !important;
+}
+
 /* MBW-61: Yelp-style customer review card */
 .review-card {
   width: 320px;

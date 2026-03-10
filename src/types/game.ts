@@ -1,5 +1,6 @@
 // MBW-6: Top-level game states
-export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER'
+// MBW-84: GAME_DAY_NOTICE added for pre-day event notification screen
+export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'GAME_DAY_NOTICE'
 
 // MBW-3: GameSave — persisted to localStorage via Zustand
 export interface GameSave {

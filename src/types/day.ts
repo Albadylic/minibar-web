@@ -19,7 +19,7 @@ export const PHASE_START_TIMES: Record<DayPhase, number> = {
 // MBW-10: DayConfig — generated at day start, not persisted
 export interface DayConfig {
   dayNumber: number
-  event: EventType | null // V2.0+ — always null in V1.0
+  event: EventType | null
   duration: typeof DAY_DURATION
   arrivalRates: {
     morning: number // customers per second
@@ -31,5 +31,10 @@ export interface DayConfig {
     patienceMultiplier: number // 1.0 = default
     coinMultiplier: number // 1.0 = default
     tipJarBonus: number // coins added on fast serves (0 = no tip jar)
+  }
+  // MBW-74: Relative spawn weights per customer type (0 = never spawns)
+  customerWeights: {
+    normal: number
+    hooligan: number
   }
 }

@@ -3,7 +3,8 @@
 // MBW-21: Walking animation (doorway → seat)
 // MBW-22: Leaving animation (seat → doorway)
 // MBW-24: Lingering after served
-import type { CustomerEntity } from '../../entities/customer'
+// MBW-74/75/76: Hooligan spawning, Game Day departure/return
+import type { CustomerEntity, CustomerType } from '../../entities/customer'
 import { nextCustomerId, resetCustomerIdCounter } from '../../entities/customer'
 import type { DayPhase } from '../../types/day'
 import type { DayConfig } from '../../types/day'
@@ -19,12 +20,15 @@ class CustomerSystem {
   private timeSinceLastSpawn = 0
   // MBW-56: Store unlocked drinks so reorders stay within unlocked set
   private unlockedDrinks: string[] = []
+  // MBW-75/76: Track whether hooligans have left for the game (Afternoon) or returned (Evening)
+  private hooligansGone = false
 
   reset(): void {
     this.customers = []
     this.occupiedSeatIds.clear()
     this.timeSinceLastSpawn = 0
     this.unlockedDrinks = []
+    this.hooligansGone = false
     resetCustomerIdCounter()
   }
 
@@ -39,9 +43,25 @@ class CustomerSystem {
     // MBW-56: Keep unlocked drinks in sync so reorders use the correct set
     this.unlockedDrinks = unlockedDrinks
 
-    // MBW-18: Spawn
+    // MBW-75: Hooligans leave for the game at Afternoon on Game Days
+    if (dayConfig.event === 'GAME_DAY' && phase === 'AFTERNOON' && !this.hooligansGone) {
+      this.hooligansGone = true
+      this.ejectHooligans()
+      eventDispatcher.emit('HOOLIGANS_LEAVE', {})
+    }
+
+    // MBW-76: Hooligans return from the game at Evening
+    if (dayConfig.event === 'GAME_DAY' && phase === 'EVENING' && this.hooligansGone) {
+      this.hooligansGone = false
+      eventDispatcher.emit('HOOLIGANS_RETURN', {})
+    }
+
+    // MBW-18: Spawn — suppress hooligans during their absence (Afternoon)
     if (!isLastOrders) {
-      this.updateSpawning(dt, dayConfig, phase, unlockedDrinks)
+      const spawnConfig = (dayConfig.event === 'GAME_DAY' && phase === 'AFTERNOON')
+        ? { ...dayConfig, customerWeights: { normal: 1.0, hooligan: 0 } }
+        : dayConfig
+      this.updateSpawning(dt, spawnConfig, phase, unlockedDrinks)
     }
 
     // Update all active customers
@@ -60,6 +80,7 @@ class CustomerSystem {
   }
 
   // MBW-18: Probabilistic spawning gated by arrival rate and seat availability
+  // MBW-74: Weighted type selection — picks NORMAL or HOOLIGAN based on DayConfig weights
   private updateSpawning(
     dt: number,
     dayConfig: DayConfig,
@@ -80,7 +101,22 @@ class CustomerSystem {
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
 
-    this.spawnCustomer(availableSeat.id, availableSeat.position, unlockedDrinks, dayConfig.modifiers.patienceMultiplier)
+    const customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
+    this.spawnCustomer(availableSeat.id, availableSeat.position, unlockedDrinks, dayConfig.modifiers.patienceMultiplier, customerType)
+  }
+
+  // MBW-74: Weighted random selection between NORMAL and HOOLIGAN
+  // Also gates on preferredPhases — hooligan won't spawn in Afternoon even if weight > 0
+  private rollCustomerType(
+    weights: DayConfig['customerWeights'],
+    phase: DayPhase,
+  ): CustomerType {
+    const hooliganConfig = CUSTOMER_CONFIGS.HOOLIGAN
+    const hooliganAllowed = hooliganConfig.preferredPhases.includes(phase)
+    const effectiveHooliganWeight = hooliganAllowed ? weights.hooligan : 0
+    const total = weights.normal + effectiveHooliganWeight
+    if (total === 0 || effectiveHooliganWeight === 0) return 'NORMAL'
+    return Math.random() < effectiveHooliganWeight / total ? 'HOOLIGAN' : 'NORMAL'
   }
 
   private pickAvailableSeat(): (typeof SEATS)[number] | null {
@@ -94,15 +130,20 @@ class CustomerSystem {
     seatPosition: { x: number; y: number },
     unlockedDrinks: string[],
     patienceMultiplier: number,
+    type: CustomerType = 'NORMAL',
   ): void {
-    const config = CUSTOMER_CONFIGS.NORMAL
+    const config = CUSTOMER_CONFIGS[type]
     const skin = randomSkin()
-    const drinkOrder = this.rollDrinkOrder(unlockedDrinks)
     const patienceMax = randomInRange(config.patience.min, config.patience.max) * patienceMultiplier
+    // MBW-72: Hooligans prefer their affinities; fall back to all unlocked drinks
+    const drinkPool = config.drinkAffinities.length > 0
+      ? config.drinkAffinities.filter((d) => unlockedDrinks.includes(d))
+      : unlockedDrinks
+    const drinkOrder = this.rollDrinkOrder(drinkPool.length > 0 ? drinkPool : unlockedDrinks)
 
     const customer: CustomerEntity = {
       id: nextCustomerId(),
-      type: 'NORMAL',
+      type,
       skin,
       status: 'APPROACHING',
       seatId,
@@ -114,6 +155,7 @@ class CustomerSystem {
       lingerTimer: 0,
       drinksServed: 0,
       willReorder: false,
+      canBrawl: config.canBrawl,
     }
 
     this.occupiedSeatIds.add(seatId)
@@ -143,6 +185,9 @@ class CustomerSystem {
         // Brief state — immediately transition to WAITING with new order
         customer.status = 'WAITING'
         break
+      case 'BRAWLING':
+        // MBW-78: Brawl system controls BRAWLING customers — no tick needed here
+        break
       case 'LEAVING':
         this.updateLeaving(customer, dt) // MBW-22
         break
@@ -160,12 +205,20 @@ class CustomerSystem {
   }
 
   // MBW-19: Patience countdown
+  // MBW-78: Hooligans trigger a brawl instead of leaving when patience expires
   private updateWaiting(customer: CustomerEntity, dt: number): void {
     customer.patienceTimer -= dt
     if (customer.patienceTimer <= 0) {
       customer.patienceTimer = 0
       eventDispatcher.emit('PATIENCE_EXPIRED', { customerId: customer.id })
-      // Star rating loss
+
+      if (customer.canBrawl) {
+        // Brawl system handles this — sets status to BRAWLING
+        customer.status = 'BRAWLING'
+        return
+      }
+
+      // Normal customer — star rating loss and leave
       const isGameOver = gameLoop.adjustStarRating(-STAR_RATING.lossPerBadReview)
       if (isGameOver) {
         gameLoop.triggerGameOver()
@@ -197,6 +250,15 @@ class CustomerSystem {
   // MBW-22: Walk from seat back to doorway, then remove
   private updateLeaving(customer: CustomerEntity, dt: number): void {
     this.moveToward(customer, dt, CUSTOMER_CONFIGS.NORMAL.walkSpeed)
+  }
+
+  // MBW-75: Force all hooligans out — they're leaving for the game at Afternoon
+  private ejectHooligans(): void {
+    for (const customer of this.customers) {
+      if (customer.type === 'HOOLIGAN' && customer.status !== 'LEAVING') {
+        this.startLeaving(customer)
+      }
+    }
   }
 
   private startLeaving(customer: CustomerEntity): void {
@@ -256,6 +318,13 @@ class CustomerSystem {
 
   // Called by serving system on wrong drink — customer leaves immediately
   wrongDrink(customerId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    this.startLeaving(customer)
+  }
+
+  // MBW-80: Called by brawl system to eject brawling customers regardless of current status
+  forceLeaveBrawl(customerId: string): void {
     const customer = this.customers.find((c) => c.id === customerId)
     if (!customer) return
     this.startLeaving(customer)

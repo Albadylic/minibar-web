@@ -5,6 +5,7 @@ import { eventDispatcher } from './events/eventDispatcher'
 import { pixiApp } from './renderer/pixiApp'
 import { customerSystem } from './systems/customerSystem'
 import { customerRenderer } from './renderer/customerRenderer'
+import { flyupRenderer } from './renderer/flyupRenderer'
 import { useGameStore } from '../store/gameStore'
 import { useHudStore } from '../store/hudStore'
 import type { DayConfig, DayPhase } from '../types/day'
@@ -18,9 +19,13 @@ import type { GameSave } from '../types/game'
 import { BASE_ARRIVAL_RATES, STAR_RATING, getArrivalRateMultiplier, getPatienceMultiplierForDay } from '../config/difficulty'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { useDayResultStore } from '../store/dayResultStore'
+import { GAME_DAY_CONFIG } from '../config/events'
+import { brawlSystem } from './systems/brawlSystem'
+import { resetBrawlIdCounter } from '../entities/brawl'
 
-// MBW-10/41/51: Generate DayConfig from current save — applies owned upgrade effects + day scaling
-export function generateDayConfig(save: GameSave): DayConfig {
+// MBW-10/41/51/83: Generate DayConfig from current save — applies owned upgrade effects + day scaling
+// event is determined externally (ShopScreen rolls it) and passed in here
+export function generateDayConfig(save: GameSave, event: EventType | null = null): DayConfig {
   // MBW-51: Scale arrival rates and patience with day number
   const arrivalMult = getArrivalRateMultiplier(save.dayNumber)
   const dayPatienceMult = getPatienceMultiplierForDay(save.dayNumber)
@@ -43,9 +48,14 @@ export function generateDayConfig(save: GameSave): DayConfig {
     }
   }
 
+  // MBW-74: Customer type weights — hooligans only spawn on Game Days
+  const customerWeights = event === 'GAME_DAY'
+    ? { normal: GAME_DAY_CONFIG.customerWeights.normal, hooligan: GAME_DAY_CONFIG.customerWeights.hooligan }
+    : { normal: 1.0, hooligan: 0 }
+
   return {
     dayNumber: save.dayNumber,
-    event: null, // V2.0+
+    event,
     duration: DAY_DURATION,
     arrivalRates: {
       morning: BASE_ARRIVAL_RATES.morning * arrivalMult,
@@ -58,6 +68,7 @@ export function generateDayConfig(save: GameSave): DayConfig {
       coinMultiplier: 1.0,
       tipJarBonus,
     },
+    customerWeights,
   }
 }
 
@@ -115,6 +126,8 @@ class GameLoop {
     this.accumulator = 0
 
     customerSystem.reset()
+    brawlSystem.reset()
+    resetBrawlIdCounter()
 
     useHudStore.setState({
       timeRemaining: DAY_DURATION,
@@ -188,6 +201,9 @@ class GameLoop {
       this.unlockedDrinks,
     )
 
+    // MBW-78/80: Update brawl system
+    brawlSystem.update(dt)
+
     useHudStore.setState({
       timeRemaining,
       phase: this.currentPhase,
@@ -199,6 +215,7 @@ class GameLoop {
 
   // MBW-11: Render step — sync customer display objects then render PixiJS
   private render(): void {
+    flyupRenderer.tick() // MBW-67: advance coin fly-up animations
     customerRenderer.sync(customerSystem.customers)
     pixiApp.render()
   }

@@ -23,11 +23,26 @@ export function getPatienceMultiplierForDay(dayNumber: number): number {
   return Math.max(1 - (dayNumber - 1) * 0.015, 0.7)
 }
 
-// Customer patience duration (seconds) — randomised within range per customer
-export const PATIENCE = {
-  normal: { min: 25, max: 35 },
-  linger: { min: 10, max: 15 }, // time spent sitting after being served before leaving
+// MBW-81: Brawl escalation config — radius and tap requirements scale with day number
+export const BRAWL = {
+  autoResolveFallback: 12,  // seconds before brawl resolves on its own (bad outcome)
+  tapsRequiredBase: 5,      // taps to eject on day 1
+  tapsRequiredMax: 9,       // capped at this value
+  starLossPerCasualty: 0.12, // star rating hit per affected customer
 } as const
+
+export function getBrawlTapsRequired(dayNumber: number): number {
+  // +1 tap every 3 days, capped at max
+  return Math.min(
+    BRAWL.tapsRequiredBase + Math.floor((dayNumber - 1) / 3),
+    BRAWL.tapsRequiredMax,
+  )
+}
+
+export function getBrawlRadius(dayNumber: number): number {
+  // Base radius from customer config; grows +5px every 2 days, capped at 110
+  return Math.min(60 + Math.floor((dayNumber - 1) / 2) * 5, 110)
+}
 
 // Star rating balance
 export const STAR_RATING = {

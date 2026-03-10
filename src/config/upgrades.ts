@@ -23,6 +23,8 @@ export interface UpgradeConfig {
 }
 
 // MBW-39: 5 MVP upgrades
+// MBW-108: Prices set high so upgrades feel hard-earned — ~80–200 coins for tier 1.
+// Multi-tier expansion tracked in MBW-108 (Notion); tiers array is ready to extend.
 export const UPGRADES: UpgradeConfig[] = [
   {
     id: 'better_seating',
@@ -31,7 +33,7 @@ export const UPGRADES: UpgradeConfig[] = [
     maxTier: 1,
     tiers: [
       {
-        cost: 30,
+        cost: 150,
         effects: [{ type: 'patience_multiplier', value: 1.25 }],
         description: 'Comfortable chairs keep customers waiting 25% longer.',
       },
@@ -46,7 +48,7 @@ export const UPGRADES: UpgradeConfig[] = [
     maxTier: 1,
     tiers: [
       {
-        cost: 50,
+        cost: 200,
         effects: [{ type: 'extra_capacity', value: 2 }],
         description: 'Add 2 more seats to serve more customers at once.',
       },
@@ -61,7 +63,7 @@ export const UPGRADES: UpgradeConfig[] = [
     maxTier: 1,
     tiers: [
       {
-        cost: 40,
+        cost: 120,
         effects: [{ type: 'patience_multiplier', value: 1.15 }],
         description: 'A warm hearth keeps spirits high. Customers wait 15% longer.',
       },
@@ -76,7 +78,7 @@ export const UPGRADES: UpgradeConfig[] = [
     maxTier: 1,
     tiers: [
       {
-        cost: 20,
+        cost: 80,
         effects: [{ type: 'patience_multiplier', value: 1.1 }],
         description: 'Candlelit atmosphere soothes patrons. Customers wait 10% longer.',
       },
@@ -91,7 +93,7 @@ export const UPGRADES: UpgradeConfig[] = [
     maxTier: 1,
     tiers: [
       {
-        cost: 25,
+        cost: 100,
         effects: [{ type: 'tip_jar', value: 2 }],
         description: 'Fast serves earn +2 bonus coins as a tip.',
       },

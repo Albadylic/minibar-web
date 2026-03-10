@@ -4,17 +4,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { type GameScreen, type GameSave, initialGameSave, SAVE_VERSION } from '../types/game'
+import type { EventType } from '../types/day'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 
 interface GameState {
   // UI navigation state (not persisted — resets to MAIN_MENU on load)
   screen: GameScreen
 
+  // MBW-84: Event determined in ShopScreen, consumed by DayScreen via generateDayConfig
+  // Not persisted — only lives for the duration of one day transition
+  pendingEvent: EventType | null
+
   // Persisted game save
   gameSave: GameSave
 
   // State machine transitions
   goToScreen: (screen: GameScreen) => void
+
+  // MBW-83/84: Set the pending event for the next day (called from ShopScreen)
+  setPendingEvent: (event: EventType | null) => void
 
   // Save mutations
   updateSave: (updates: Partial<GameSave>) => void
@@ -30,9 +38,12 @@ export const useGameStore = create<GameState>()(
   persist(
     (set) => ({
       screen: 'MAIN_MENU',
+      pendingEvent: null,
       gameSave: initialGameSave,
 
       goToScreen: (screen) => set({ screen }),
+
+      setPendingEvent: (event) => set({ pendingEvent: event }),
 
       updateSave: (updates) =>
         set((state) => ({
