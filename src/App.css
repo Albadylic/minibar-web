@@ -1,0 +1,41 @@
+/* Game canvas container — 375×667 logical resolution, CSS-scaled with letterboxing */
+.game-container {
+  position: relative;
+  width: 375px;
+  height: 667px;
+}
+
+.screen {
+  width: 375px;
+  height: 667px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #2b1a00;
+  border: 2px solid #5c3d11;
+}
+
+.screen h1 {
+  font-size: 2.5rem;
+}
+
+.screen h2 {
+  font-size: 2rem;
+}
+
+.screen button {
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #5c3d11;
+  color: #f5e6c8;
+  border: 2px solid #8b6331;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.screen button:hover {
+  background: #7a5220;
+}
