@@ -10,6 +10,7 @@ import type { DayPhase } from '../../types/day'
 import type { DayConfig } from '../../types/day'
 import { CUSTOMER_CONFIGS, randomSkin, randomInRange } from '../../config/customers'
 import { SEATS, DOORWAY } from '../../config/barLayout'
+import { DRINKS_BY_ID } from '../../config/drinks'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { STAR_RATING } from '../../config/difficulty'
@@ -139,11 +140,8 @@ class CustomerSystem {
     const config = CUSTOMER_CONFIGS[type]
     const skin = randomSkin()
     const patienceMax = randomInRange(config.patience.min, config.patience.max) * patienceMultiplier
-    // MBW-72: Hooligans prefer their affinities; fall back to all unlocked drinks
-    const drinkPool = config.drinkAffinities.length > 0
-      ? config.drinkAffinities.filter((d) => unlockedDrinks.includes(d))
-      : unlockedDrinks
-    const drinkOrder = this.rollDrinkOrder(drinkPool.length > 0 ? drinkPool : unlockedDrinks)
+    // MBW-86: Weighted drink selection by customer type affinity
+    const drinkOrder = this.rollDrinkOrder(unlockedDrinks, type)
 
     const customer: CustomerEntity = {
       id: nextCustomerId(),
@@ -169,11 +167,26 @@ class CustomerSystem {
     eventDispatcher.emit('CUSTOMER_ARRIVED', { customerId: customer.id, seatId })
   }
 
-  private rollDrinkOrder(unlockedDrinks: string[]): string {
-    // Equal weight among unlocked drinks for NORMAL customers in V1.0
-    // (Drink-customer affinity system is V2.0 — MBW-86)
+  // MBW-86: Weighted selection — drink weights come from DrinkConfig.customerAffinities
+  private rollDrinkOrder(unlockedDrinks: string[], type: CustomerType = 'NORMAL'): string {
     if (unlockedDrinks.length === 0) return 'lager'
-    return unlockedDrinks[Math.floor(Math.random() * unlockedDrinks.length)]!
+
+    const weights: number[] = unlockedDrinks.map((drinkId) => {
+      const drink = DRINKS_BY_ID[drinkId]
+      if (!drink) return 1.0
+      const affs = drink.customerAffinities
+      if (type === 'HOOLIGAN') return affs.hooligan ?? affs.normal
+      if (type === 'RICH') return affs.rich ?? affs.normal
+      return affs.normal
+    })
+
+    const total = weights.reduce((sum, w) => sum + w, 0)
+    let r = Math.random() * total
+    for (let i = 0; i < unlockedDrinks.length; i++) {
+      r -= weights[i]!
+      if (r <= 0) return unlockedDrinks[i]!
+    }
+    return unlockedDrinks[unlockedDrinks.length - 1]!
   }
 
   private updateCustomer(customer: CustomerEntity, dt: number): void {
@@ -241,7 +254,7 @@ class CustomerSystem {
       if (customer.willReorder) {
         // MBW-56: Use unlocked drinks, not the full DRINKS_BY_ID set
         const config = CUSTOMER_CONFIGS[customer.type]
-        customer.drinkOrder = this.rollDrinkOrder(this.unlockedDrinks)
+        customer.drinkOrder = this.rollDrinkOrder(this.unlockedDrinks, customer.type)
         customer.patienceTimer = randomInRange(config.patience.min, config.patience.max)
         customer.patienceMax = customer.patienceTimer
         customer.status = 'REORDERING'

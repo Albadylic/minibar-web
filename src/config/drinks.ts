@@ -9,8 +9,9 @@ export interface DrinkConfig {
   coinReward: number
   placeholderColor: number // hex color for placeholder circle
   customerAffinities: {
-    normal: number   // 0–1 weight for NORMAL customers
-    rich?: number    // MBW-91: optional affinity for RICH customers
+    normal: number       // weight for NORMAL customers
+    hooligan?: number    // MBW-86: weight for HOOLIGAN customers (undefined = use normal weight)
+    rich?: number        // MBW-91: weight for RICH customers
   }
 }
 
@@ -22,7 +23,7 @@ export const DRINKS: DrinkConfig[] = [
     unlockDay: 1,
     coinReward: 5,
     placeholderColor: 0xf5c842,
-    customerAffinities: { normal: 1.0 },
+    customerAffinities: { normal: 1.0, hooligan: 1.5 },
   },
   {
     id: 'ale',
@@ -31,7 +32,7 @@ export const DRINKS: DrinkConfig[] = [
     unlockDay: 1,
     coinReward: 5,
     placeholderColor: 0xc47a2b,
-    customerAffinities: { normal: 1.0 },
+    customerAffinities: { normal: 1.0, hooligan: 1.2 },
   },
   {
     id: 'stout',
@@ -40,7 +41,7 @@ export const DRINKS: DrinkConfig[] = [
     unlockDay: 4,
     coinReward: 8,
     placeholderColor: 0x3b1e08,
-    customerAffinities: { normal: 0.8 },
+    customerAffinities: { normal: 0.8, hooligan: 1.1 },
   },
   {
     id: 'cider',
