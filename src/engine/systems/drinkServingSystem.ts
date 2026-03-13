@@ -8,6 +8,7 @@ import { barScene } from '../renderer/barScene'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { STAR_RATING } from '../../config/difficulty'
 import { CUSTOMER_CONFIGS } from '../../config/customers'
+import { entertainerSystem } from './entertainerSystem'
 
 class DrinkServingSystem {
   // MBW-26: Toggle drink selection on tap click
@@ -46,7 +47,7 @@ class DrinkServingSystem {
     if (isCorrect) {
       // MBW-28/91: Award coins with type multiplier (rich = 1.8×) + tip jar on fast serves
       const isFastServe = customer.patienceTimer / customer.patienceMax > 0.5
-      const coins = Math.round((drink?.coinReward ?? 0) * customer.coinMultiplier) + (isFastServe ? gameLoop.tipJarBonus : 0)
+      const coins = Math.round((drink?.coinReward ?? 0) * customer.coinMultiplier * gameLoop.dayCoinMultiplier * entertainerSystem.getCoinBoostMult()) + (isFastServe ? gameLoop.tipJarBonus : 0)
       gameLoop.addCoins(coins)
 
       // Star rating gain — skill bonus if patience still > 50%

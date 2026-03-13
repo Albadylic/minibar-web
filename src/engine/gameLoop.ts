@@ -19,10 +19,11 @@ import type { GameSave } from '../types/game'
 import { BASE_ARRIVAL_RATES, STAR_RATING, getArrivalRateMultiplier, getPatienceMultiplierForDay } from '../config/difficulty'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { useDayResultStore } from '../store/dayResultStore'
-import { GAME_DAY_CONFIG } from '../config/events'
+import { GAME_DAY_CONFIG, EVENT_CONFIGS } from '../config/events'
 import { brawlSystem } from './systems/brawlSystem'
 import { securitySystem } from './systems/securitySystem'
 import { cleaningSystem } from './systems/cleaningSystem'
+import { entertainerSystem, computeUpdatedLikelihood } from './systems/entertainerSystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
 
@@ -57,34 +58,46 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
     }
   }
 
-  // MBW-93: Rich weight scales with prestige upgrades owned
-  const richWeight = prestigePoints * 0.05
+  // Apply event-specific modifiers
+  const eventCfg = event ? EVENT_CONFIGS[event] : null
+  const eventArrivalMult = eventCfg?.arrivalMult ?? 1.0
+  const eventCoinMult = eventCfg?.coinMult ?? 1.0
+  patienceMultiplier *= eventCfg?.patienceMult ?? 1.0
+
+  // MBW-93: Rich weight from prestige + event boost (some events guarantee rich customers)
+  const richWeight = prestigePoints * 0.05 + (eventCfg?.richBoost ?? 0)
   // MBW-95: Drunks appear at low rate after Day 5
   const drunkWeight = save.dayNumber >= 5 ? 0.05 : 0
 
-  // MBW-74: Customer type weights — hooligans only spawn on Game Days
-  const customerWeights = event === 'GAME_DAY'
-    ? {
-        normal: GAME_DAY_CONFIG.customerWeights.normal,
-        hooligan: GAME_DAY_CONFIG.customerWeights.hooligan * hooliganReductionMult,
-        rich: richWeight,
-        drunk: drunkWeight,
-      }
-    : { normal: 1.0, hooligan: 0, rich: richWeight, drunk: drunkWeight }
+  // MBW-74: Customer type weights — hooligans only on Game Day; rich boosted by prestige/events
+  let customerWeights: DayConfig['customerWeights']
+  if (event === 'GAME_DAY') {
+    customerWeights = {
+      normal: GAME_DAY_CONFIG.customerWeights.normal,
+      hooligan: GAME_DAY_CONFIG.customerWeights.hooligan * hooliganReductionMult,
+      rich: richWeight,
+      drunk: drunkWeight,
+    }
+  } else if (event === 'NOBLES_VISIT') {
+    // Noble's Visit: rich customers dominate regardless of prestige
+    customerWeights = { normal: 0.4, hooligan: 0, rich: Math.max(richWeight, 0.6), drunk: drunkWeight * 0.5 }
+  } else {
+    customerWeights = { normal: 1.0, hooligan: 0, rich: richWeight, drunk: drunkWeight }
+  }
 
   return {
     dayNumber: save.dayNumber,
     event,
     duration: DAY_DURATION,
     arrivalRates: {
-      morning: BASE_ARRIVAL_RATES.morning * arrivalMult,
-      afternoon: BASE_ARRIVAL_RATES.afternoon * arrivalMult,
-      evening: BASE_ARRIVAL_RATES.evening * arrivalMult,
-      night: BASE_ARRIVAL_RATES.night * arrivalMult,
+      morning: BASE_ARRIVAL_RATES.morning * arrivalMult * eventArrivalMult,
+      afternoon: BASE_ARRIVAL_RATES.afternoon * arrivalMult * eventArrivalMult,
+      evening: BASE_ARRIVAL_RATES.evening * arrivalMult * eventArrivalMult,
+      night: BASE_ARRIVAL_RATES.night * arrivalMult * eventArrivalMult,
     },
     modifiers: {
       patienceMultiplier,
-      coinMultiplier: 1.0,
+      coinMultiplier: eventCoinMult,
       tipJarBonus,
     },
     customerWeights,
@@ -226,6 +239,8 @@ class GameLoop {
     securitySystem.update(dt)
     // MBW-101: Update cleaner NPC pathfinding
     cleaningSystem.tick(dt)
+    // MBW-116: Advance entertainer walk animation
+    entertainerSystem.tick(dt)
 
     useHudStore.setState({
       timeRemaining,
@@ -255,10 +270,21 @@ class GameLoop {
 
     const { gameSave, updateSave, goToScreen } = useGameStore.getState()
 
+    // MBW-121: Update entertainer return likelihoods based on whether the player tipped
+    const tipResult = entertainerSystem.getTipResult()
+    const updatedEntertainers = { ...gameSave.entertainers }
+    if (tipResult) {
+      const current = gameSave.entertainers[tipResult.entertainerId].returnLikelihood
+      updatedEntertainers[tipResult.entertainerId] = {
+        returnLikelihood: computeUpdatedLikelihood(current, tipResult.tipped),
+      }
+    }
+
     updateSave({
       coins: this.coins,
       starRating: this.starRating,
       dayNumber: gameSave.dayNumber + 1,
+      entertainers: updatedEntertainers,
       stats: {
         ...gameSave.stats,
         totalDaysPlayed: gameSave.stats.totalDaysPlayed + 1,
@@ -286,6 +312,13 @@ class GameLoop {
 
   addCoins(amount: number): void {
     this.coins += amount
+  }
+
+  // Returns false if player can't afford it
+  spendCoins(amount: number): boolean {
+    if (this.coins < amount) return false
+    this.coins -= amount
+    return true
   }
 
   // Returns true if rating dropped below game over threshold
@@ -334,6 +367,10 @@ class GameLoop {
 
   get tipJarBonus(): number {
     return this.dayConfig?.modifiers.tipJarBonus ?? 0
+  }
+
+  get dayCoinMultiplier(): number {
+    return this.dayConfig?.modifiers.coinMultiplier ?? 1.0
   }
 
   get state() {

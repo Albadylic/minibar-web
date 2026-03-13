@@ -1,6 +1,5 @@
 // MBW-6: Top-level game states
-// MBW-84: GAME_DAY_NOTICE added for pre-day event notification screen
-export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'GAME_DAY_NOTICE'
+export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'EVENT_NOTICE'
 
 // MBW-3: GameSave — persisted to localStorage via Zustand
 export interface GameSave {
@@ -18,6 +17,13 @@ export interface GameSave {
 
   // Event state
   daysSinceLastGameDay: number
+
+  // MBW-121: Entertainer return likelihoods (0–1). Missing key → use DEFAULT_RETURN_LIKELIHOOD.
+  entertainers: {
+    jinx: { returnLikelihood: number }
+    roland: { returnLikelihood: number }
+    melody: { returnLikelihood: number }
+  }
 
   // Lifetime stats
   stats: {
@@ -43,6 +49,11 @@ export const initialGameSave: GameSave = {
   barCapacity: 13,
   unlockedDrinks: ['lager', 'ale'],
   daysSinceLastGameDay: 0,
+  entertainers: {
+    jinx: { returnLikelihood: 0.7 },
+    roland: { returnLikelihood: 0.7 },
+    melody: { returnLikelihood: 0.7 },
+  },
   stats: {
     totalCustomersServed: 0,
     totalBrawls: 0,

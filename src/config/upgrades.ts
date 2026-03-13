@@ -29,20 +29,28 @@ export interface UpgradeConfig {
   placeholderColor: number
 }
 
-// MBW-39: 5 MVP upgrades
-// MBW-108: Prices set high so upgrades feel hard-earned — ~80–200 coins for tier 1.
-// Multi-tier expansion tracked in MBW-108 (Notion); tiers array is ready to extend.
+// MBW-39/135: 5 MVP upgrades, each with 2–3 tiers
 export const UPGRADES: UpgradeConfig[] = [
   {
     id: 'better_seating',
     name: 'Better Seating',
     category: 'seating',
-    maxTier: 1,
+    maxTier: 3,
     tiers: [
       {
         cost: 150,
         effects: [{ type: 'patience_multiplier', value: 1.25 }],
-        description: 'Comfortable chairs keep customers waiting 25% longer.',
+        description: 'Comfortable chairs. Customers wait 25% longer.',
+      },
+      {
+        cost: 300,
+        effects: [{ type: 'patience_multiplier', value: 1.35 }],
+        description: 'Cushioned seats. Customers wait an additional 35% longer.',
+      },
+      {
+        cost: 550,
+        effects: [{ type: 'patience_multiplier', value: 1.5 }],
+        description: 'Plush banquettes. Customers linger 50% longer — the finest in town.',
       },
     ],
     visualPlacement: { x: 95, y: 300 },
@@ -52,12 +60,17 @@ export const UPGRADES: UpgradeConfig[] = [
     id: 'extra_seating',
     name: 'Extra Seating',
     category: 'seating',
-    maxTier: 1,
+    maxTier: 2,
     tiers: [
       {
         cost: 200,
         effects: [{ type: 'extra_capacity', value: 2 }],
         description: 'Add 2 more seats to serve more customers at once.',
+      },
+      {
+        cost: 400,
+        effects: [{ type: 'extra_capacity', value: 4 }],
+        description: 'Add 4 more seats — a significant capacity boost.',
       },
     ],
     visualPlacement: { x: 280, y: 475 },
@@ -67,12 +80,17 @@ export const UPGRADES: UpgradeConfig[] = [
     id: 'fireplace',
     name: 'Fireplace',
     category: 'ambience',
-    maxTier: 1,
+    maxTier: 2,
     tiers: [
       {
         cost: 120,
         effects: [{ type: 'patience_multiplier', value: 1.15 }],
         description: 'A warm hearth keeps spirits high. Customers wait 15% longer.',
+      },
+      {
+        cost: 250,
+        effects: [{ type: 'patience_multiplier', value: 1.25 }],
+        description: 'A roaring fire. Customers are thoroughly comfortable — 25% longer.',
       },
     ],
     visualPlacement: { x: 340, y: 400 },
@@ -82,12 +100,17 @@ export const UPGRADES: UpgradeConfig[] = [
     id: 'candles',
     name: 'Décor — Candles',
     category: 'ambience',
-    maxTier: 1,
+    maxTier: 2,
     tiers: [
       {
         cost: 80,
         effects: [{ type: 'patience_multiplier', value: 1.1 }],
-        description: 'Candlelit atmosphere soothes patrons. Customers wait 10% longer.',
+        description: 'Candlelit atmosphere. Customers wait 10% longer.',
+      },
+      {
+        cost: 180,
+        effects: [{ type: 'patience_multiplier', value: 1.2 }],
+        description: 'Ornate candelabras. The ambience draws people in — 20% longer.',
       },
     ],
     visualPlacement: { x: 187, y: 350 },
@@ -97,12 +120,17 @@ export const UPGRADES: UpgradeConfig[] = [
     id: 'tip_jar',
     name: 'Tip Jar',
     category: 'service',
-    maxTier: 1,
+    maxTier: 2,
     tiers: [
       {
         cost: 100,
         effects: [{ type: 'tip_jar', value: 2 }],
         description: 'Fast serves earn +2 bonus coins as a tip.',
+      },
+      {
+        cost: 220,
+        effects: [{ type: 'tip_jar', value: 4 }],
+        description: 'A polished silver jar. Fast serves earn +4 bonus coins.',
       },
     ],
     visualPlacement: { x: 187, y: 90 },

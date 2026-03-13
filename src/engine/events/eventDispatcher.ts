@@ -37,6 +37,11 @@ export type GameEventMap = {
   // MBW-99/100: Mess events
   MESS_SPAWNED: { messId: string; position: { x: number; y: number } }
   MESS_CLEANED: { messId: string }
+
+  // MBW-116/121: Entertainer events
+  ENTERTAINER_ARRIVED: { entertainerId: string }
+  ENTERTAINER_TIPPED: { entertainerId: string; amount: number }
+  ENTERTAINER_LEFT: { entertainerId: string }
 }
 
 type EventHandler<T> = (payload: T) => void

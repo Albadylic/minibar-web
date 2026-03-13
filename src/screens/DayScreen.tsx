@@ -15,6 +15,7 @@ import { drinkServingSystem } from '../engine/systems/drinkServingSystem'
 import { brawlSystem } from '../engine/systems/brawlSystem'
 import { securitySystem } from '../engine/systems/securitySystem'
 import { cleaningSystem } from '../engine/systems/cleaningSystem'
+import { entertainerSystem } from '../engine/systems/entertainerSystem'
 import { getUnlockedDrinks } from '../config/drinks'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 
@@ -80,12 +81,14 @@ export function DayScreen() {
       customerRenderer.init(pixiApp.app)
       flyupRenderer.init(pixiApp.app) // MBW-67
       cleaningSystem.init(pixiApp.app, cleanerSpeed) // MBW-101
+      entertainerSystem.init(pixiApp.app, save) // MBW-116
     })
 
     return () => {
       cancelled = true
       flyupRenderer.destroy()
       cleaningSystem.destroy()
+      entertainerSystem.destroy()
       customerRenderer.destroy()
       barScene.destroy()
       pixiApp.destroy()
@@ -129,7 +132,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function DayHud({ dayNumber }: { dayNumber: number }) {
-  const { timeRemaining, phase, coins, starRating, selectedDrinkId } = useHudStore()
+  const { timeRemaining, phase, coins, starRating, selectedDrinkId, performingEntertainer } = useHudStore()
 
   const minutes = Math.floor(timeRemaining / 60)
   const seconds = Math.floor(timeRemaining % 60)
@@ -143,6 +146,9 @@ function DayHud({ dayNumber }: { dayNumber: number }) {
       <StarRating rating={starRating} />
       <span className="hud-coins">🪙 {coins}</span>
       {selectedDrinkId && <span className="hud-selected">▶ {selectedDrinkId}</span>}
+      {performingEntertainer && (
+        <span className="hud-entertainer">♪ {performingEntertainer}</span>
+      )}
     </div>
   )
 }

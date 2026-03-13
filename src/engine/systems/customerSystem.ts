@@ -14,6 +14,7 @@ import { DRINKS_BY_ID } from '../../config/drinks'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { STAR_RATING } from '../../config/difficulty'
+import { entertainerSystem } from './entertainerSystem'
 
 class CustomerSystem {
   customers: CustomerEntity[] = []
@@ -60,7 +61,7 @@ class CustomerSystem {
     // MBW-18: Spawn — suppress hooligans during their absence (Afternoon)
     if (!isLastOrders) {
       const spawnConfig = (dayConfig.event === 'GAME_DAY' && phase === 'AFTERNOON')
-        ? { ...dayConfig, customerWeights: { normal: 1.0, hooligan: 0 } }
+        ? { ...dayConfig, customerWeights: { ...dayConfig.customerWeights, normal: 1.0, hooligan: 0 } }
         : dayConfig
       this.updateSpawning(dt, spawnConfig, phase, unlockedDrinks)
     }
@@ -225,8 +226,9 @@ class CustomerSystem {
 
   // MBW-19: Patience countdown
   // MBW-78: Hooligans trigger a brawl instead of leaving when patience expires
+  // MBW-116: Patience decay slowed while an entertainer is performing
   private updateWaiting(customer: CustomerEntity, dt: number): void {
-    customer.patienceTimer -= dt
+    customer.patienceTimer -= dt * entertainerSystem.getDecayMult(customer.type)
     if (customer.patienceTimer <= 0) {
       customer.patienceTimer = 0
       eventDispatcher.emit('PATIENCE_EXPIRED', { customerId: customer.id })

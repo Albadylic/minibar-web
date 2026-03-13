@@ -82,9 +82,14 @@ export function ShopScreen() {
 
           return (
             <div key={upgrade.id} className={`upgrade-card ${isMaxed ? 'upgrade-maxed' : ''}`}>
-              <div className="upgrade-name">{upgrade.name}</div>
+              <div className="upgrade-name">
+                {upgrade.name}
+                {upgrade.maxTier > 1 && (
+                  <span className="upgrade-tier"> {isMaxed ? `★${currentTier}` : `${currentTier}/${upgrade.maxTier}`}</span>
+                )}
+              </div>
               {isMaxed ? (
-                <div className="upgrade-owned">✓ Owned</div>
+                <div className="upgrade-owned">✓ Maxed</div>
               ) : tierConfig ? (
                 <>
                   <div className="upgrade-desc">{tierConfig.description}</div>
@@ -108,7 +113,7 @@ export function ShopScreen() {
         setPendingEvent(event)
         if (event) {
           updateSave({ daysSinceLastGameDay: 0 })
-          goToScreen('GAME_DAY_NOTICE')
+          goToScreen('EVENT_NOTICE')
         } else {
           updateSave({ daysSinceLastGameDay: gameSave.daysSinceLastGameDay + 1 })
           goToScreen('DAY_IN_PROGRESS')

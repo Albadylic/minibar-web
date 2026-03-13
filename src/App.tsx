@@ -6,7 +6,7 @@ import { MainMenuScreen } from './screens/MainMenuScreen'
 import { DayScreen } from './screens/DayScreen'
 import { ShopScreen } from './screens/ShopScreen'
 import { GameOverScreen } from './screens/GameOverScreen'
-import { GameDayNoticeScreen } from './screens/GameDayNoticeScreen'
+import { EventNoticeScreen } from './screens/EventNoticeScreen'
 import './App.css'
 
 export function App() {
@@ -23,8 +23,8 @@ export function App() {
         return <ShopScreen />
       case 'GAME_OVER':
         return <GameOverScreen />
-      case 'GAME_DAY_NOTICE':
-        return <GameDayNoticeScreen />
+      case 'EVENT_NOTICE':
+        return <EventNoticeScreen />
     }
   }
 

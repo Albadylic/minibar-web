@@ -9,6 +9,7 @@ interface HudState {
   coins: number
   starRating: number
   selectedDrinkId: string | null
+  performingEntertainer: string | null  // MBW-116: null = no performer
 }
 
 export const useHudStore = create<HudState>()(() => ({
@@ -17,4 +18,5 @@ export const useHudStore = create<HudState>()(() => ({
   coins: 0,
   starRating: 3.0,
   selectedDrinkId: null,
+  performingEntertainer: null,
 }))
