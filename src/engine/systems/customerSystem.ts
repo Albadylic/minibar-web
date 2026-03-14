@@ -3,7 +3,8 @@
 // MBW-21: Walking animation (doorway → seat)
 // MBW-22: Leaving animation (seat → doorway)
 // MBW-24: Lingering after served
-// MBW-74/75/76: Hooligan spawning, Game Day departure/return
+// MBW-74: Hooligan spawning on Game Days
+// MBW-156: Removed afternoon departure/return rule — hooligans stay for full day
 import type { CustomerEntity, CustomerType } from '../../entities/customer'
 import { nextCustomerId, resetCustomerIdCounter } from '../../entities/customer'
 import type { DayPhase } from '../../types/day'
@@ -22,15 +23,12 @@ class CustomerSystem {
   private timeSinceLastSpawn = 0
   // MBW-56: Store unlocked drinks so reorders stay within unlocked set
   private unlockedDrinks: string[] = []
-  // MBW-75/76: Track whether hooligans have left for the game (Afternoon) or returned (Evening)
-  private hooligansGone = false
 
   reset(): void {
     this.customers = []
     this.occupiedSeatIds.clear()
     this.timeSinceLastSpawn = 0
     this.unlockedDrinks = []
-    this.hooligansGone = false
     resetCustomerIdCounter()
   }
 
@@ -45,25 +43,9 @@ class CustomerSystem {
     // MBW-56: Keep unlocked drinks in sync so reorders use the correct set
     this.unlockedDrinks = unlockedDrinks
 
-    // MBW-75: Hooligans leave for the game at Afternoon on Game Days
-    if (dayConfig.event === 'GAME_DAY' && phase === 'AFTERNOON' && !this.hooligansGone) {
-      this.hooligansGone = true
-      this.ejectHooligans()
-      eventDispatcher.emit('HOOLIGANS_LEAVE', {})
-    }
-
-    // MBW-76: Hooligans return from the game at Evening
-    if (dayConfig.event === 'GAME_DAY' && phase === 'EVENING' && this.hooligansGone) {
-      this.hooligansGone = false
-      eventDispatcher.emit('HOOLIGANS_RETURN', {})
-    }
-
-    // MBW-18: Spawn — suppress hooligans during their absence (Afternoon)
+    // MBW-18: Spawn new customers each tick (suppressed during Last Orders)
     if (!isLastOrders) {
-      const spawnConfig = (dayConfig.event === 'GAME_DAY' && phase === 'AFTERNOON')
-        ? { ...dayConfig, customerWeights: { ...dayConfig.customerWeights, normal: 1.0, hooligan: 0 } }
-        : dayConfig
-      this.updateSpawning(dt, spawnConfig, phase, unlockedDrinks)
+      this.updateSpawning(dt, dayConfig, phase, unlockedDrinks)
     }
 
     // Update all active customers
@@ -103,8 +85,16 @@ class CustomerSystem {
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
 
-    const customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
-    this.spawnCustomer(availableSeat.id, availableSeat.position, unlockedDrinks, dayConfig.modifiers.patienceMultiplier, customerType)
+    let customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
+    // MBW-181: Doorman tier 2 — chance to turn away a hooligan at the door
+    if (customerType === 'HOOLIGAN' && dayConfig.modifiers.hooliganFilterChance > 0 && Math.random() < dayConfig.modifiers.hooliganFilterChance) {
+      customerType = 'NORMAL'
+    }
+    // MBW-181: Doorman tier 3 — rich clientele get a patience boost on entry
+    const effectivePatienceMult = customerType === 'RICH'
+      ? dayConfig.modifiers.patienceMultiplier * dayConfig.modifiers.richPatienceMultiplier
+      : dayConfig.modifiers.patienceMultiplier
+    this.spawnCustomer(availableSeat.id, availableSeat.position, unlockedDrinks, effectivePatienceMult, customerType)
   }
 
   // MBW-74/91/95: Weighted random selection across all customer types
@@ -269,15 +259,6 @@ class CustomerSystem {
   // MBW-22: Walk from seat back to doorway, then remove
   private updateLeaving(customer: CustomerEntity, dt: number): void {
     this.moveToward(customer, dt, CUSTOMER_CONFIGS.NORMAL.walkSpeed)
-  }
-
-  // MBW-75: Force all hooligans out — they're leaving for the game at Afternoon
-  private ejectHooligans(): void {
-    for (const customer of this.customers) {
-      if (customer.type === 'HOOLIGAN' && customer.status !== 'LEAVING') {
-        this.startLeaving(customer)
-      }
-    }
   }
 
   private startLeaving(customer: CustomerEntity): void {

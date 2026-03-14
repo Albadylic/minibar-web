@@ -9,6 +9,11 @@ export interface UpgradeEffect {
     | 'prestige'             // MBW-104: attracts rich clientele (value = prestige points)
     | 'reduce_hooligan_spawn'// MBW-103: multiplies hooligan weight on Game Days (value = multiplier)
     | 'cleaner'              // MBW-101: autonomous mess cleaner NPC (value = cleaner speed px/s)
+    | 'stage'               // MBW-178: unlocks Stage so entertainers can perform
+    | 'jukebox_boost'       // MBW-178: fallback music boosts all customer patience (value = multiplier)
+    | 'reduce_drunk_spawn'  // MBW-181: Doorman tier 1 — fewer drunks enter (value = spawn multiplier)
+    | 'filter_hooligan'     // MBW-181: Doorman tier 2 — chance to turn away hooligans at door (value = probability)
+    | 'rich_patience_boost' // MBW-181: Doorman tier 3 — rich clientele patience boost on entry (value = multiplier)
   value: number
 }
 
@@ -24,6 +29,8 @@ export interface UpgradeConfig {
   category: 'seating' | 'ambience' | 'service' | 'staff' | 'environment'
   maxTier: number
   tiers: UpgradeTier[]
+  // MBW-178: Earliest day this upgrade appears in the shop rotation
+  minDay: number
   // Visual placement in bar canvas (for MBW-42)
   visualPlacement: { x: number; y: number }
   placeholderColor: number
@@ -36,6 +43,7 @@ export const UPGRADES: UpgradeConfig[] = [
     name: 'Better Seating',
     category: 'seating',
     maxTier: 3,
+    minDay: 1,
     tiers: [
       {
         cost: 150,
@@ -61,6 +69,7 @@ export const UPGRADES: UpgradeConfig[] = [
     name: 'Extra Seating',
     category: 'seating',
     maxTier: 2,
+    minDay: 1,
     tiers: [
       {
         cost: 200,
@@ -81,6 +90,7 @@ export const UPGRADES: UpgradeConfig[] = [
     name: 'Fireplace',
     category: 'ambience',
     maxTier: 2,
+    minDay: 2,
     tiers: [
       {
         cost: 120,
@@ -101,6 +111,7 @@ export const UPGRADES: UpgradeConfig[] = [
     name: 'Décor — Candles',
     category: 'ambience',
     maxTier: 2,
+    minDay: 2,
     tiers: [
       {
         cost: 80,
@@ -121,6 +132,7 @@ export const UPGRADES: UpgradeConfig[] = [
     name: 'Tip Jar',
     category: 'service',
     maxTier: 2,
+    minDay: 1,
     tiers: [
       {
         cost: 100,
@@ -139,22 +151,28 @@ export const UPGRADES: UpgradeConfig[] = [
 ]
 
 // MBW-88/89: Bouncer upgrade — auto-responds to brawls
-// Tier 1: single brawl, 7s response. Tier 2: multiple brawls, 4s response.
+// MBW-180: Tier 3 — 2s response, all brawls, near-instant drunk escort
 const BOUNCER_UPGRADE: UpgradeConfig = {
   id: 'bouncer',
-  name: 'Bouncer',
+  name: 'Security',
   category: 'staff',
-  maxTier: 2,
+  maxTier: 3,
+  minDay: 3,
   tiers: [
     {
-      cost: 250,
-      effects: [{ type: 'bouncer', value: 7 }], // value = response time seconds
-      description: 'A bouncer handles one brawl at a time. Response: 7s.',
+      cost: 200,
+      effects: [{ type: 'bouncer', value: 7 }],
+      description: 'A bouncer handles one brawl at a time (7s). Auto-escorts drunks (6s).',
     },
     {
-      cost: 500,
-      effects: [{ type: 'bouncer', value: 4 }], // faster, multiple brawls
-      description: 'Security team handles multiple brawls simultaneously. Response: 4s.',
+      cost: 400,
+      effects: [{ type: 'bouncer', value: 4 }],
+      description: 'Security team handles multiple brawls (4s) and drunks (3s) simultaneously.',
+    },
+    {
+      cost: 650,
+      effects: [{ type: 'bouncer', value: 2 }],
+      description: 'Crack squad. All brawls resolved in 2s. Drunks escorted almost immediately.',
     },
   ],
   visualPlacement: { x: 30, y: 630 },
@@ -162,16 +180,28 @@ const BOUNCER_UPGRADE: UpgradeConfig = {
 }
 
 // MBW-101: Cleaner upgrade — autonomous mess-clearing NPC
+// MBW-179: Expanded to 3 tiers with increasing speed and tier 3 no-idle-pause
 const CLEANER_UPGRADE: UpgradeConfig = {
   id: 'cleaner',
   name: 'Cleaner',
   category: 'staff',
-  maxTier: 1,
+  maxTier: 3,
+  minDay: 2,
   tiers: [
     {
-      cost: 180,
+      cost: 150,
       effects: [{ type: 'cleaner', value: 80 }], // value = speed px/s
-      description: 'A cleaner roams the bar and wipes up messes automatically.',
+      description: 'A cleaner roams the bar and wipes up messes. Standard speed.',
+    },
+    {
+      cost: 300,
+      effects: [{ type: 'cleaner', value: 120 }],
+      description: '50% faster movement between messes.',
+    },
+    {
+      cost: 500,
+      effects: [{ type: 'cleaner', value: 160 }],
+      description: 'Double speed. Starts the next mess immediately — no idle pause.',
     },
   ],
   visualPlacement: { x: 345, y: 630 },
@@ -184,6 +214,7 @@ const NO_TEAM_COLOURS_UPGRADE: UpgradeConfig = {
   name: "No Team Colours",
   category: 'environment',
   maxTier: 1,
+  minDay: 3,
   tiers: [
     {
       cost: 180,
@@ -201,6 +232,7 @@ const TAPESTRIES_UPGRADE: UpgradeConfig = {
   name: 'Tapestries',
   category: 'environment',
   maxTier: 1,
+  minDay: 4,
   tiers: [
     {
       cost: 150,
@@ -217,6 +249,7 @@ const CHANDELIER_UPGRADE: UpgradeConfig = {
   name: 'Chandelier',
   category: 'environment',
   maxTier: 1,
+  minDay: 8,
   tiers: [
     {
       cost: 250,
@@ -233,6 +266,7 @@ const FINE_TABLES_UPGRADE: UpgradeConfig = {
   name: 'Fine Tables',
   category: 'environment',
   maxTier: 1,
+  minDay: 6,
   tiers: [
     {
       cost: 350,
@@ -244,6 +278,77 @@ const FINE_TABLES_UPGRADE: UpgradeConfig = {
   placeholderColor: 0x7a5c2a,
 }
 
+// MBW-178: Stage — unlocks live entertainers (Jinx, Roland, Melody)
+const STAGE_UPGRADE: UpgradeConfig = {
+  id: 'stage',
+  name: 'Stage',
+  category: 'environment',
+  maxTier: 1,
+  minDay: 5,
+  tiers: [
+    {
+      cost: 300,
+      effects: [{ type: 'stage', value: 1 }],
+      description: 'A small performance stage. Entertainers can now be hired each evening.',
+    },
+  ],
+  visualPlacement: { x: 187, y: 160 },
+  placeholderColor: 0x4a3a20,
+}
+
+// MBW-178: Jukebox — fallback music that passively boosts customer patience
+const JUKEBOX_UPGRADE: UpgradeConfig = {
+  id: 'jukebox',
+  name: 'Jukebox',
+  category: 'environment',
+  maxTier: 1,
+  minDay: 5,
+  tiers: [
+    {
+      cost: 200,
+      effects: [{ type: 'jukebox_boost', value: 1.1 }],
+      description: 'Background music soothes the crowd. All customers wait 10% longer.',
+    },
+  ],
+  visualPlacement: { x: 340, y: 160 },
+  placeholderColor: 0x223344,
+}
+
+// MBW-181: Doorman — reduces drunk entry, filters hooligans, VIP greeting
+const DOORMAN_UPGRADE: UpgradeConfig = {
+  id: 'doorman',
+  name: 'Doorman',
+  category: 'staff',
+  maxTier: 3,
+  minDay: 6,
+  tiers: [
+    {
+      cost: 250,
+      effects: [{ type: 'reduce_drunk_spawn', value: 0.5 }],
+      description: 'Reduces drunk customers by ~50%. Security still needed for those that get through.',
+    },
+    {
+      cost: 450,
+      effects: [
+        { type: 'reduce_drunk_spawn', value: 0.5 },
+        { type: 'filter_hooligan', value: 0.2 },
+      ],
+      description: '~20% chance to turn hooligans away at the door on non-Game Days.',
+    },
+    {
+      cost: 700,
+      effects: [
+        { type: 'reduce_drunk_spawn', value: 0.5 },
+        { type: 'filter_hooligan', value: 0.2 },
+        { type: 'rich_patience_boost', value: 1.1 },
+      ],
+      description: 'VIP greeter: rich clientele enter with +10% patience.',
+    },
+  ],
+  visualPlacement: { x: 30, y: 480 },
+  placeholderColor: 0x223322,
+}
+
 UPGRADES.push(
   BOUNCER_UPGRADE,
   CLEANER_UPGRADE,
@@ -251,6 +356,9 @@ UPGRADES.push(
   TAPESTRIES_UPGRADE,
   CHANDELIER_UPGRADE,
   FINE_TABLES_UPGRADE,
+  STAGE_UPGRADE,
+  JUKEBOX_UPGRADE,
+  DOORMAN_UPGRADE,
 )
 
 export const UPGRADES_BY_ID = Object.fromEntries(UPGRADES.map((u) => [u.id, u]))

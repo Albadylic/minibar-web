@@ -31,6 +31,8 @@ export interface DayConfig {
     patienceMultiplier: number // 1.0 = default
     coinMultiplier: number // 1.0 = default
     tipJarBonus: number // coins added on fast serves (0 = no tip jar)
+    richPatienceMultiplier: number // MBW-181: Doorman tier 3 extra patience for rich clientele (1.0 = default)
+    hooliganFilterChance: number   // MBW-181: Doorman tier 2 probability to turn away a hooligan (0 = no filter)
   }
   // MBW-74/91/95: Relative spawn weights per customer type (0 = never spawns)
   customerWeights: {

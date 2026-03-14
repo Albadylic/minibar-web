@@ -38,6 +38,9 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
   let tipJarBonus = 0
   let prestigePoints = 0
   let hooliganReductionMult = 1.0
+  let reduceDrunkSpawnMult = 1.0
+  let richPatienceMultiplier = 1.0
+  let hooliganFilterChance = 0
 
   for (const [upgradeId, owned] of Object.entries(save.upgrades)) {
     const config = UPGRADES_BY_ID[upgradeId]
@@ -53,6 +56,12 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
         prestigePoints += effect.value
       } else if (effect.type === 'reduce_hooligan_spawn') {
         hooliganReductionMult *= effect.value
+      } else if (effect.type === 'reduce_drunk_spawn') {
+        reduceDrunkSpawnMult *= effect.value
+      } else if (effect.type === 'rich_patience_boost') {
+        richPatienceMultiplier *= effect.value
+      } else if (effect.type === 'filter_hooligan') {
+        hooliganFilterChance = Math.max(hooliganFilterChance, effect.value)
       }
       // extra_capacity is applied to barCapacity in GameSave at purchase time
     }
@@ -66,15 +75,16 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
 
   // MBW-93: Rich weight from prestige + event boost (some events guarantee rich customers)
   const richWeight = prestigePoints * 0.05 + (eventCfg?.richBoost ?? 0)
-  // MBW-95: Drunks appear at low rate after Day 5
-  const drunkWeight = save.dayNumber >= 5 ? 0.05 : 0
+  // MBW-95: Drunks appear at low rate after Day 5; MBW-181: Doorman tier 1 reduces spawn rate
+  const drunkWeight = (save.dayNumber >= 5 ? 0.05 : 0) * reduceDrunkSpawnMult
 
-  // MBW-74: Customer type weights — hooligans only on Game Day; rich boosted by prestige/events
+  // MBW-74: Customer type weights — hooligans at full weight on Game Day (poster has no effect);
+  // MBW-165: small base hooligan chance on normal days, suppressed to 0 by No Team Colours poster
   let customerWeights: DayConfig['customerWeights']
   if (event === 'GAME_DAY') {
     customerWeights = {
       normal: GAME_DAY_CONFIG.customerWeights.normal,
-      hooligan: GAME_DAY_CONFIG.customerWeights.hooligan * hooliganReductionMult,
+      hooligan: GAME_DAY_CONFIG.customerWeights.hooligan, // poster ignored on Game Day (MBW-165)
       rich: richWeight,
       drunk: drunkWeight,
     }
@@ -82,7 +92,9 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
     // Noble's Visit: rich customers dominate regardless of prestige
     customerWeights = { normal: 0.4, hooligan: 0, rich: Math.max(richWeight, 0.6), drunk: drunkWeight * 0.5 }
   } else {
-    customerWeights = { normal: 1.0, hooligan: 0, rich: richWeight, drunk: drunkWeight }
+    // MBW-165: 0.08 base hooligan weight on non-Game Days; No Team Colours poster (hooliganReductionMult < 1) zeroes it
+    const nonGameDayHooligan = hooliganReductionMult < 1.0 ? 0 : 0.08
+    customerWeights = { normal: 1.0, hooligan: nonGameDayHooligan, rich: richWeight, drunk: drunkWeight }
   }
 
   return {
@@ -99,6 +111,8 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
       patienceMultiplier,
       coinMultiplier: eventCoinMult,
       tipJarBonus,
+      richPatienceMultiplier,
+      hooliganFilterChance,
     },
     customerWeights,
   }

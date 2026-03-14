@@ -22,10 +22,6 @@ export type GameEventMap = {
   DRINK_SERVED: { customerId: string; drinkId: string; wasCorrect: boolean; coinsEarned: number }
   WRONG_DRINK: { customerId: string; drinkId: string }
 
-  // MBW-74/75/76: Hooligan Game Day lifecycle
-  HOOLIGANS_LEAVE: Record<string, never>   // hooligans depart at Afternoon
-  HOOLIGANS_RETURN: Record<string, never>  // hooligans return at Evening
-
   // MBW-77/78/80: Brawl events
   BRAWL_STARTED: { brawlId: string; instigatorId: string; affectedCount: number }
   BRAWLER_TAPPED: { brawlId: string; tapsReceived: number; tapsRequired: number }

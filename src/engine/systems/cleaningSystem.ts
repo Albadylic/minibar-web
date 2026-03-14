@@ -1,6 +1,7 @@
 // MBW-99: Mess spawning — probabilistic on serve/leave events
 // MBW-100: Tap-to-clean — messes are clickable PixiJS objects
 // MBW-101: Cleaner NPC — autonomous pathfinding to nearest mess
+// MBW-179: Tier 2 adds 50% speed; tier 3 adds double speed + no idle pause between messes
 import { Container, Graphics } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import type { MessEntity } from '../../entities/mess'
@@ -14,12 +15,16 @@ const MESS_RADIUS = 5
 const CLEANER_RADIUS = 8
 const CLEANER_START = { x: 30, y: 580 }
 const CLEANER_REACH = 12 // canvas units — "arrived" when within this distance
+// MBW-179: Tier 1/2 pause between messes; tier 3 starts next mess immediately
+const CLEANER_IDLE_PAUSE = 1.5 // seconds
 
 interface CleanerState {
   active: boolean
   position: { x: number; y: number }
   targetMessId: string | null
   speed: number
+  noIdlePause: boolean
+  idlePauseRemaining: number
 }
 
 class CleaningSystem {
@@ -27,14 +32,14 @@ class CleaningSystem {
   private stage: Container | null = null
   private messDisplays = new Map<string, Graphics>()
   private cleanerGraphic: Graphics | null = null
-  private cleaner: CleanerState = { active: false, position: { ...CLEANER_START }, targetMessId: null, speed: 80 }
+  private cleaner: CleanerState = { active: false, position: { ...CLEANER_START }, targetMessId: null, speed: 80, noIdlePause: false, idlePauseRemaining: 0 }
 
-  init(app: Application, cleanerSpeed: number | null): void {
+  init(app: Application, cleanerSpeed: number | null, noIdlePause = false): void {
     this.stage = new Container()
     app.stage.addChildAt(this.stage, 1) // render below customers
 
     if (cleanerSpeed !== null) {
-      this.cleaner = { active: true, position: { ...CLEANER_START }, targetMessId: null, speed: cleanerSpeed }
+      this.cleaner = { active: true, position: { ...CLEANER_START }, targetMessId: null, speed: cleanerSpeed, noIdlePause, idlePauseRemaining: 0 }
       this.cleanerGraphic = new Graphics()
       this.cleanerGraphic.circle(0, 0, CLEANER_RADIUS)
       this.cleanerGraphic.fill({ color: 0x446655 })
@@ -63,6 +68,7 @@ class CleaningSystem {
     this.messDisplays.clear()
     this.cleaner.position = { ...CLEANER_START }
     this.cleaner.targetMessId = null
+    this.cleaner.idlePauseRemaining = 0
   }
 
   // MBW-99: Spilt drink mess after a successful serve
@@ -126,8 +132,15 @@ class CleaningSystem {
   }
 
   // MBW-101: Cleaner NPC tick — pathfind to nearest mess, clean on arrival
+  // MBW-179: Tier 1/2 pause 1.5s after each clean; tier 3 starts immediately
   tick(dt: number): void {
     if (!this.cleaner.active || !this.cleanerGraphic) return
+
+    // Count down idle pause between messes
+    if (this.cleaner.idlePauseRemaining > 0) {
+      this.cleaner.idlePauseRemaining = Math.max(0, this.cleaner.idlePauseRemaining - dt)
+      return
+    }
 
     // Find a target if we don't have one
     if (!this.cleaner.targetMessId) {
@@ -148,10 +161,13 @@ class CleaningSystem {
     const step = this.cleaner.speed * dt
 
     if (dist <= CLEANER_REACH) {
-      // Arrived — clean the mess
+      // Arrived — clean the mess, then start idle pause (unless tier 3)
       this.cleaner.position.x = mess.position.x
       this.cleaner.position.y = mess.position.y
       this.cleaner.targetMessId = null
+      if (!this.cleaner.noIdlePause) {
+        this.cleaner.idlePauseRemaining = CLEANER_IDLE_PAUSE
+      }
       this.cleanMess(mess.id)
     } else {
       this.cleaner.position.x += (dx / dist) * step

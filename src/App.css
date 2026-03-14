@@ -1,11 +1,15 @@
 /* MBW-12: Wrapper that holds the fixed 375×667 game and is CSS-scaled to fit any viewport.
    transform-origin center means scaling shrinks/grows from the middle of the element.
-   width/height fix the layout box so transform doesn't collapse it. */
+   width/height fix the layout box so transform doesn't collapse it.
+   MBW-144: will-change promotes to its own compositor layer so sub-pixel font rendering
+   stays sharp at non-integer scale values. */
 .viewport-scaler {
   width: 375px;
   height: 667px;
   transform-origin: center center;
   flex-shrink: 0;
+  will-change: transform;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Game canvas container — 375×667 logical resolution, CSS-scaled with letterboxing */
@@ -141,6 +145,49 @@
   color: #ffd700;
 }
 
+/* MBW-154: Timer urgency — shake/pulse when time is running low */
+@keyframes timer-shake-gentle {
+  0%, 100% { transform: translateX(0); }
+  30%  { transform: translateX(-1px); }
+  70%  { transform: translateX(1px); }
+}
+
+@keyframes timer-shake-erratic {
+  0%, 100% { transform: translateX(0); }
+  15%  { transform: translateX(-3px); }
+  35%  { transform: translateX(3px); }
+  55%  { transform: translateX(-2px); }
+  75%  { transform: translateX(2px); }
+}
+
+@keyframes timer-shake-frantic {
+  0%, 100% { transform: translate(0, 0); }
+  10%  { transform: translate(-4px,  1px); }
+  20%  { transform: translate( 4px, -1px); }
+  30%  { transform: translate(-3px,  2px); }
+  40%  { transform: translate( 3px,  0px); }
+  50%  { transform: translate(-4px, -1px); }
+  60%  { transform: translate( 4px,  1px); }
+  70%  { transform: translate(-3px,  0px); }
+  80%  { transform: translate( 3px, -1px); }
+  90%  { transform: translate(-2px,  0px); }
+}
+
+.hud-timer.timer-urgent {
+  animation: timer-shake-gentle 0.8s ease-in-out infinite;
+  color: #ddaa22;
+}
+
+.hud-timer.timer-erratic {
+  animation: timer-shake-erratic 0.4s ease-in-out infinite;
+  color: #dd6622;
+}
+
+.hud-timer.timer-frantic {
+  animation: timer-shake-frantic 0.2s ease-in-out infinite;
+  color: #cc2222;
+}
+
 /* MBW-66: Star rating transition animations */
 @keyframes star-gain {
   0%   { transform: scale(1);   filter: brightness(1); }
@@ -270,4 +317,41 @@
 .upgrade-buy:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* MBW-177: Two-tab shop layout */
+.shop-tabs {
+  display: flex;
+  width: 320px;
+  border-bottom: 1px solid #5c3d11;
+}
+
+.shop-tab {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: transparent;
+  color: #b89060;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  min-width: unset;
+}
+
+.shop-tab:hover {
+  background: rgba(92, 61, 17, 0.25);
+}
+
+.shop-tab.active {
+  color: #f5e6c8;
+  border-bottom-color: #8b6331;
+  background: transparent;
+}
+
+.shop-staff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
 }

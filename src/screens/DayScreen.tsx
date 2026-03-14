@@ -39,7 +39,7 @@ export function DayScreen() {
     const dayConfig = generateDayConfig(save, pendingEvent)
     gameLoop.start(dayConfig, save.coins, save.starRating, unlockedDrinks)
     brawlSystem.init(save.dayNumber)
-    const bouncerTier = (save.upgrades['bouncer']?.tier ?? 0) as 0 | 1 | 2
+    const bouncerTier = (save.upgrades['bouncer']?.tier ?? 0) as 0 | 1 | 2 | 3
     securitySystem.init(bouncerTier)
     drinkServingSystem.init()
 
@@ -67,21 +67,27 @@ export function DayScreen() {
 
     const ownedUpgrades = Object.keys(save.upgrades)
 
-    // MBW-101: Cleaner speed from owned upgrade (null = no cleaner NPC)
-    const cleanerUpgradeTier = save.upgrades['cleaner']
-      ? UPGRADES_BY_ID['cleaner']?.tiers[(save.upgrades['cleaner']?.tier ?? 1) - 1]
+    // MBW-101/179: Cleaner speed from owned upgrade tier (null = no cleaner NPC)
+    const cleanerTier = save.upgrades['cleaner']?.tier ?? 0
+    const cleanerUpgradeTier = cleanerTier > 0
+      ? UPGRADES_BY_ID['cleaner']?.tiers[cleanerTier - 1]
       : null
     const cleanerSpeed = cleanerUpgradeTier
       ? (cleanerUpgradeTier.effects.find((e) => e.type === 'cleaner')?.value ?? null)
       : null
+    // MBW-179: Tier 3 cleaner starts next mess without idle pause
+    const cleanerNoIdlePause = cleanerTier >= 3
 
     pixiApp.init(canvas).then(() => {
       if (cancelled || !pixiApp.app) return
       barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades)
       customerRenderer.init(pixiApp.app)
       flyupRenderer.init(pixiApp.app) // MBW-67
-      cleaningSystem.init(pixiApp.app, cleanerSpeed) // MBW-101
-      entertainerSystem.init(pixiApp.app, save) // MBW-116
+      cleaningSystem.init(pixiApp.app, cleanerSpeed, cleanerNoIdlePause) // MBW-101/179
+      // MBW-178: Entertainers only available once Stage is purchased
+      if (save.upgrades['stage']) {
+        entertainerSystem.init(pixiApp.app, save) // MBW-116
+      }
     })
 
     return () => {
@@ -132,20 +138,25 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function DayHud({ dayNumber }: { dayNumber: number }) {
-  const { timeRemaining, phase, coins, starRating, selectedDrinkId, performingEntertainer } = useHudStore()
+  const { timeRemaining, phase, coins, starRating, performingEntertainer } = useHudStore()
 
   const minutes = Math.floor(timeRemaining / 60)
   const seconds = Math.floor(timeRemaining % 60)
   const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
 
+  // MBW-154: Escalating urgency animation below 24s / 10s / 5s
+  const timerClass =
+    timeRemaining < 5 ? 'timer-frantic' :
+    timeRemaining < 10 ? 'timer-erratic' :
+    timeRemaining < 24 ? 'timer-urgent' : ''
+
   return (
     <div className="hud">
       <span className="hud-day">Day {dayNumber}</span>
-      <span className="hud-timer">{timeStr}</span>
+      <span className={`hud-timer ${timerClass}`}>{timeStr}</span>
       <span className="hud-phase">{phase}</span>
       <StarRating rating={starRating} />
       <span className="hud-coins">🪙 {coins}</span>
-      {selectedDrinkId && <span className="hud-selected">▶ {selectedDrinkId}</span>}
       {performingEntertainer && (
         <span className="hud-entertainer">♪ {performingEntertainer}</span>
       )}

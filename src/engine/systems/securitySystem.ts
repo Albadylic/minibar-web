@@ -1,19 +1,22 @@
 // MBW-88: Bouncer upgrade — auto-responds to brawls after a response delay
 // MBW-89: Tier 2 Security Team — faster, handles multiple brawls simultaneously
+// MBW-180: Tier 3 Security Team — 2s response, handles all brawls, near-instant drunk escort
 import type { SecurityState } from '../../entities/security'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { brawlSystem } from './brawlSystem'
 import { customerSystem } from './customerSystem'
 import type { CustomerEntity } from '../../entities/customer'
 
-// Delay before security auto-escorts a drunk customer (seconds)
-const DRUNK_ESCORT_DELAY = 6
+// Drunk escort delay per tier (seconds)
+const DRUNK_ESCORT_DELAYS: Record<1 | 2 | 3, number> = { 1: 6, 2: 3, 3: 1 }
+// Brawl response time per tier (seconds)
+const BRAWL_RESPONSE_TIMES: Record<1 | 2 | 3, number> = { 1: 7, 2: 4, 3: 2 }
 
 class SecuritySystem {
   private state: SecurityState | null = null
   private drunkTimers = new Map<string, number>() // customerId → countdown
 
-  init(bouncerTier: 0 | 1 | 2): void {
+  init(bouncerTier: 0 | 1 | 2 | 3): void {
     if (bouncerTier === 0) {
       this.state = null
       return
@@ -37,13 +40,13 @@ class SecuritySystem {
     this.drunkTimers.clear()
   }
 
-  // MBW-88: On BRAWL_STARTED, schedule an auto-resolve if security is free (Tier 1) or always (Tier 2)
+  // MBW-88: On BRAWL_STARTED, schedule an auto-resolve if security is free (Tier 1) or always (Tier 2/3)
   private handleBrawlStarted = ({ brawlId }: { brawlId: string }): void => {
     if (!this.state) return
     const { tier, responses } = this.state
-    if (tier === 1 && responses.length >= 1) return // bouncer is busy
+    if (tier === 1 && responses.length >= 1) return // bouncer is busy (tier 2/3 handle unlimited)
 
-    const responseTime = tier === 2 ? 4 : 7
+    const responseTime = BRAWL_RESPONSE_TIMES[tier]
     this.state.responses.push({ brawlId, timer: responseTime })
   }
 
@@ -52,8 +55,7 @@ class SecuritySystem {
     if (!this.state) return
     const customer = customerSystem.getCustomer(customerId)
     if (!customer || customer.canBeServed) return // only drunks
-    const delay = this.state.tier === 2 ? DRUNK_ESCORT_DELAY / 2 : DRUNK_ESCORT_DELAY
-    this.drunkTimers.set(customerId, delay)
+    this.drunkTimers.set(customerId, DRUNK_ESCORT_DELAYS[this.state.tier])
   }
 
   private handleDrunkEscorted = ({ customerId }: { customerId: string }): void => {

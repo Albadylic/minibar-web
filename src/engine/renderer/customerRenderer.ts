@@ -105,8 +105,12 @@ class CustomerRenderer {
     ejectBar.visible = false
     root.addChild(ejectBar)
 
-    // Skin name label (small, for placeholder clarity)
-    const label = new Text({ text: customer.skin[0]!.toUpperCase(), style: labelStyle })
+    // MBW-164: Type-specific markers make special customers instantly recognisable
+    const markerText =
+      customer.type === 'HOOLIGAN' ? 'H' :
+      customer.type === 'RICH' ? 'D' :
+      customer.skin[0]!.toUpperCase()
+    const label = new Text({ text: markerText, style: labelStyle })
     label.anchor.set(0.5)
     label.position.set(0, 1)
     root.addChild(label)
