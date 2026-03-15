@@ -20,6 +20,7 @@
 }
 
 .screen {
+  position: relative;
   width: 375px;
   height: 667px;
   display: flex;
@@ -317,6 +318,48 @@
 .upgrade-buy:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* MBW-173: Tutorial overlay */
+.tutorial-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 2, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  border-radius: 8px;
+}
+
+.tutorial-card {
+  background: #2a1a08;
+  border: 1px solid #8b6331;
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 290px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tutorial-title {
+  font-size: 1rem;
+  color: #f5e6c8;
+  margin: 0;
+}
+
+.tutorial-body {
+  font-size: 0.82rem;
+  color: #c4a87a;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.tutorial-dismiss {
+  align-self: center;
+  margin-top: 4px;
 }
 
 /* MBW-177: Two-tab shop layout */

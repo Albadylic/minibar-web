@@ -18,12 +18,12 @@ export const EVENT_CONFIGS: Record<EventType, EventConfig> = {
   GAME_DAY: {
     name: 'Game Day',
     emoji: '⚽',
-    flavour: 'The local team is playing today. Expect rowdy fans — serve them fast or face the consequences.',
+    flavour: "The local team is playing today. Rowdy fans will fill the bar all day — serve them fast or they'll cause trouble. Even your 'No Team Colours' posters won't keep them out on a match day.",
     tips: [
-      'Hooligans arrive in the Morning',
-      'They leave for kick-off at Afternoon',
-      'They return in force at Evening',
+      'Hooligans arrive early and stay all day',
       "Ignore them and they'll start a brawl — tap them to eject",
+      'Watch out for brawls in crowded corners',
+      'Security helps — hire a bouncer if you can',
     ],
     arrivalMult: 1.0,
     coinMult: 1.0,
@@ -37,7 +37,7 @@ export const EVENT_CONFIGS: Record<EventType, EventConfig> = {
     flavour: 'The town market has drawn traders and travellers from across the region. A busy, profitable day.',
     tips: [
       'More customers than usual — the bar fills up fast',
-      'Merchants pay a little extra',
+      'All drinks earn 10% more today',
       'Rich customers appear even without fine décor',
     ],
     arrivalMult: 1.35,
@@ -99,22 +99,26 @@ export const GAME_DAY_CONFIG = {
 } as const
 
 // Per-event probability config
+// MBW-172: minDay values aligned with gradual complexity unlock schedule
 const EVENT_PROBABILITIES: Record<EventType, {
   baseProbability: number
   pityBonusPerDay: number
   minDay: number  // earliest day this event can appear
 }> = {
-  GAME_DAY:         { baseProbability: 0.15, pityBonusPerDay: 0.10, minDay: 2 },
-  MARKET_DAY:       { baseProbability: 0.12, pityBonusPerDay: 0.08, minDay: 2 },
-  NOBLES_VISIT:     { baseProbability: 0.08, pityBonusPerDay: 0.06, minDay: 5 },
-  HARVEST_FESTIVAL: { baseProbability: 0.12, pityBonusPerDay: 0.09, minDay: 2 },
-  BARD_NIGHT:       { baseProbability: 0.12, pityBonusPerDay: 0.08, minDay: 2 },
+  GAME_DAY:         { baseProbability: 0.15, pityBonusPerDay: 0.10, minDay: 4 }, // forced on Day 3; random from Day 4
+  MARKET_DAY:       { baseProbability: 0.12, pityBonusPerDay: 0.08, minDay: 8 },
+  NOBLES_VISIT:     { baseProbability: 0.08, pityBonusPerDay: 0.06, minDay: 15 },
+  HARVEST_FESTIVAL: { baseProbability: 0.12, pityBonusPerDay: 0.09, minDay: 10 },
+  BARD_NIGHT:       { baseProbability: 0.12, pityBonusPerDay: 0.08, minDay: 5 },
 }
 
 // MBW-83: Roll which event (if any) fires on the next day.
 // Multiple events can pass their individual rolls; one is chosen at random.
 // daysSinceLastGameDay acts as a shared pity timer across all event types.
 export function rollNextDayEvent(save: GameSave): EventType | null {
+  // MBW-172: Day 3 is always a Game Day — introduces brawl mechanic to the player
+  if (save.dayNumber === 3) return 'GAME_DAY'
+
   const eventTypes = Object.keys(EVENT_PROBABILITIES) as EventType[]
 
   const fired: EventType[] = []

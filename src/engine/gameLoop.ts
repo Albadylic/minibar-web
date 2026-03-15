@@ -62,6 +62,9 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
         richPatienceMultiplier *= effect.value
       } else if (effect.type === 'filter_hooligan') {
         hooliganFilterChance = Math.max(hooliganFilterChance, effect.value)
+      } else if (effect.type === 'jukebox_boost') {
+        // MBW-115: Jukebox boosts all customer patience (applied at spawn time)
+        patienceMultiplier *= effect.value
       }
       // extra_capacity is applied to barCapacity in GameSave at purchase time
     }
@@ -73,13 +76,14 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
   const eventCoinMult = eventCfg?.coinMult ?? 1.0
   patienceMultiplier *= eventCfg?.patienceMult ?? 1.0
 
-  // MBW-93: Rich weight from prestige + event boost (some events guarantee rich customers)
-  const richWeight = prestigePoints * 0.05 + (eventCfg?.richBoost ?? 0)
   // MBW-95: Drunks appear at low rate after Day 5; MBW-181: Doorman tier 1 reduces spawn rate
   const drunkWeight = (save.dayNumber >= 5 ? 0.05 : 0) * reduceDrunkSpawnMult
 
+  // MBW-93/172: Rich customers require Day 6+ AND prestige upgrades (events can still force them earlier)
+  const richWeight = (save.dayNumber >= 6 ? prestigePoints * 0.05 : 0) + (eventCfg?.richBoost ?? 0)
+
   // MBW-74: Customer type weights — hooligans at full weight on Game Day (poster has no effect);
-  // MBW-165: small base hooligan chance on normal days, suppressed to 0 by No Team Colours poster
+  // MBW-165/172: small base hooligan chance on normal days from Day 3+, suppressed by No Team Colours
   let customerWeights: DayConfig['customerWeights']
   if (event === 'GAME_DAY') {
     customerWeights = {
@@ -92,8 +96,8 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
     // Noble's Visit: rich customers dominate regardless of prestige
     customerWeights = { normal: 0.4, hooligan: 0, rich: Math.max(richWeight, 0.6), drunk: drunkWeight * 0.5 }
   } else {
-    // MBW-165: 0.08 base hooligan weight on non-Game Days; No Team Colours poster (hooliganReductionMult < 1) zeroes it
-    const nonGameDayHooligan = hooliganReductionMult < 1.0 ? 0 : 0.08
+    // MBW-165/172: 0.08 base hooligan weight from Day 3+; No Team Colours poster zeroes it
+    const nonGameDayHooligan = (save.dayNumber >= 3 && hooliganReductionMult >= 1.0) ? 0.08 : 0
     customerWeights = { normal: 1.0, hooligan: nonGameDayHooligan, rich: richWeight, drunk: drunkWeight }
   }
 

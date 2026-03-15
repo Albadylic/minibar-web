@@ -9,6 +9,7 @@ import { useDayResultStore } from '../store/dayResultStore'
 import { selectReview } from '../engine/systems/reviewSystem'
 import { UPGRADES, type UpgradeConfig } from '../config/upgrades'
 import { rollNextDayEvent } from '../config/events'
+import { getPendingTutorials } from '../config/tutorials'
 import { useMemo, useState } from 'react'
 
 // Deterministic shuffle seeded by day number — same upgrades always show for the same day
@@ -88,6 +89,21 @@ export function ShopScreen() {
   // MBW-177: Staff upgrades — always visible, never rotate
   const staffUpgrades = useMemo(() => pickStaffUpgrades(UPGRADES), [])
 
+  // MBW-173: Tutorials pending for this upcoming day (computed once on mount)
+  const pendingTutorials = useMemo(
+    () => getPendingTutorials(upcomingDay, gameSave.shownTutorials, gameSave.upgrades),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+  const [tutorialIndex, setTutorialIndex] = useState(0)
+  const activeTutorial = pendingTutorials[tutorialIndex] ?? null
+
+  function dismissTutorial() {
+    if (!activeTutorial) return
+    updateSave({ shownTutorials: [...gameSave.shownTutorials, activeTutorial.id] })
+    setTutorialIndex((i) => i + 1)
+  }
+
   function handlePurchase(upgradeId: string) {
     purchaseUpgrade(upgradeId)
     setPurchasedToday((prev) => new Set(prev).add(upgradeId))
@@ -131,6 +147,17 @@ export function ShopScreen() {
 
   return (
     <div className="screen shop-screen">
+      {/* MBW-173: Tutorial overlay — shown one at a time before the shop is usable */}
+      {activeTutorial && (
+        <div className="tutorial-overlay">
+          <div className="tutorial-card">
+            <h3 className="tutorial-title">{activeTutorial.title}</h3>
+            <p className="tutorial-body">{activeTutorial.body}</p>
+            <button className="tutorial-dismiss" onClick={dismissTutorial}>Got it!</button>
+          </div>
+        </div>
+      )}
+
       <h2>Day {completedDay} Complete</h2>
       <div className="day-summary">
         <span>⭐ {gameSave.starRating.toFixed(1)}</span>

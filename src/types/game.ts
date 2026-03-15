@@ -34,6 +34,9 @@ export interface GameSave {
     totalWrongDrinks: number
   }
 
+  // MBW-173: Track which tutorial popups have been shown (so they don't repeat)
+  shownTutorials: string[]
+
   // Meta
   lastSavedAt: number
   version: number
@@ -61,6 +64,7 @@ export const initialGameSave: GameSave = {
     totalDaysPlayed: 0,
     totalWrongDrinks: 0,
   },
+  shownTutorials: [],
   lastSavedAt: 0,
   version: SAVE_VERSION,
 }

@@ -15,6 +15,15 @@ const flyupStyle = new TextStyle({
   dropShadow: { color: 0x000000, blur: 2, distance: 1, alpha: 0.6 },
 })
 
+// MBW-153: Red ! style for missed customer feedback
+const missStyle = new TextStyle({
+  fontSize: 14,
+  fill: 0xcc2222,
+  fontFamily: 'Georgia, serif',
+  fontWeight: 'bold',
+  dropShadow: { color: 0x000000, blur: 2, distance: 1, alpha: 0.6 },
+})
+
 interface Flyup {
   text: Text
   y: number
@@ -31,6 +40,7 @@ class FlyupRenderer {
     app.stage.addChild(this.stage)
     this.lastTime = performance.now()
     eventDispatcher.on('DRINK_SERVED', this.handleDrinkServed)
+    eventDispatcher.on('PATIENCE_EXPIRED', this.handlePatienceExpired)
   }
 
   private handleDrinkServed = ({
@@ -48,6 +58,22 @@ class FlyupRenderer {
     const text = new Text({ text: `+${coinsEarned}`, style: flyupStyle })
     text.anchor.set(0.5)
     // Spawn slightly above the customer's centre
+    const startY = customer.position.y - 24
+    text.position.set(customer.position.x, startY)
+    this.stage.addChild(text)
+
+    this.flyups.push({ text, y: startY, alpha: 1 })
+  }
+
+  // MBW-153: Red ! flyup when a customer leaves unserved
+  private handlePatienceExpired = ({ customerId }: { customerId: string }): void => {
+    if (!this.stage) return
+
+    const customer = customerSystem.customers.find((c) => c.id === customerId)
+    if (!customer) return
+
+    const text = new Text({ text: '!', style: missStyle })
+    text.anchor.set(0.5)
     const startY = customer.position.y - 24
     text.position.set(customer.position.x, startY)
     this.stage.addChild(text)
@@ -79,6 +105,7 @@ class FlyupRenderer {
 
   destroy(): void {
     eventDispatcher.off('DRINK_SERVED', this.handleDrinkServed)
+    eventDispatcher.off('PATIENCE_EXPIRED', this.handlePatienceExpired)
     this.stage?.destroy({ children: true })
     this.stage = null
     this.flyups = []

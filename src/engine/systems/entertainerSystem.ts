@@ -99,8 +99,9 @@ class EntertainerSystem {
       this.onReachedTarget()
     }
 
-    this.graphic.position.set(e.position.x, e.position.y)
-    if (this.label) this.label.position.set(e.position.x, e.position.y - 20)
+    // MBW-152: onReachedTarget may destroy graphic/label when entertainer exits — guard before access
+    this.graphic?.position.set(e.position.x, e.position.y)
+    this.label?.position.set(e.position.x, e.position.y - 20)
   }
 
   // ---- Private ----
