@@ -1,8 +1,10 @@
 // MBW-67: Coin '+X' fly-up on earn — PixiJS text that floats up and fades from serve position
-import { Container, Text, TextStyle } from 'pixi.js'
+// MBW-68: Drink splash circle — coloured ring that expands and fades on correct serve
+import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { customerSystem } from '../systems/customerSystem'
+import { DRINKS_BY_ID } from '../../config/drinks'
 
 const FLYUP_DURATION = 0.9  // seconds until fully faded
 const FLYUP_SPEED    = 45   // canvas units per second upward
@@ -24,15 +26,28 @@ const missStyle = new TextStyle({
   dropShadow: { color: 0x000000, blur: 2, distance: 1, alpha: 0.6 },
 })
 
+const SPLASH_DURATION = 0.45  // seconds
+const SPLASH_MAX_RADIUS = 18
+
 interface Flyup {
   text: Text
   y: number
   alpha: number
 }
 
+// MBW-68: Drink-coloured expanding ring on serve
+interface Splash {
+  gfx: Graphics
+  cx: number
+  cy: number
+  elapsed: number
+  color: number
+}
+
 class FlyupRenderer {
   private stage: Container | null = null
   private flyups: Flyup[] = []
+  private splashes: Splash[] = []
   private lastTime = 0
 
   init(app: Application): void {
@@ -45,16 +60,27 @@ class FlyupRenderer {
 
   private handleDrinkServed = ({
     customerId,
+    drinkId,
     coinsEarned,
   }: {
     customerId: string
+    drinkId: string
     coinsEarned: number
   }): void => {
-    if (!this.stage || coinsEarned <= 0) return
+    if (!this.stage) return
 
     const customer = customerSystem.customers.find((c) => c.id === customerId)
     if (!customer) return
 
+    // MBW-68: Expanding ring in the drink's colour
+    const drink = DRINKS_BY_ID[drinkId]
+    const color = drink?.placeholderColor ?? 0xffffff
+    const gfx = new Graphics()
+    gfx.position.set(0, 0)
+    this.stage.addChild(gfx)
+    this.splashes.push({ gfx, cx: customer.position.x, cy: customer.position.y, elapsed: 0, color })
+
+    if (coinsEarned <= 0) return
     const text = new Text({ text: `+${coinsEarned}`, style: flyupStyle })
     text.anchor.set(0.5)
     // Spawn slightly above the customer's centre
@@ -83,7 +109,7 @@ class FlyupRenderer {
 
   // Called from game loop render step — uses wall-clock delta so it runs at frame rate
   tick(): void {
-    if (!this.stage || this.flyups.length === 0) return
+    if (!this.stage) return
 
     const now = performance.now()
     const dt = Math.min((now - this.lastTime) / 1000, 0.1)
@@ -101,6 +127,23 @@ class FlyupRenderer {
         this.flyups.splice(i, 1)
       }
     }
+
+    // MBW-68: Animate drink splash rings
+    for (let i = this.splashes.length - 1; i >= 0; i--) {
+      const s = this.splashes[i]!
+      s.elapsed += dt
+      const progress = s.elapsed / SPLASH_DURATION  // 0 → 1
+      if (progress >= 1) {
+        s.gfx.destroy()
+        this.splashes.splice(i, 1)
+        continue
+      }
+      const radius = SPLASH_MAX_RADIUS * progress
+      const alpha = 1 - progress
+      s.gfx.clear()
+      s.gfx.circle(s.cx, s.cy, radius)
+      s.gfx.stroke({ color: s.color, width: 2, alpha })
+    }
   }
 
   destroy(): void {
@@ -109,6 +152,7 @@ class FlyupRenderer {
     this.stage?.destroy({ children: true })
     this.stage = null
     this.flyups = []
+    this.splashes = []
   }
 }
 

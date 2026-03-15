@@ -2,6 +2,7 @@
 export interface MessEntity {
   id: string
   position: { x: number; y: number }
+  seatId: string | null  // MBW-167: seat blocked by this mess (null = floor mess with no seat association)
 }
 
 let _nextMessId = 0

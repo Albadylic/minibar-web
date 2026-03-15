@@ -36,6 +36,7 @@ import {
   computeNewLevel,
 } from '../config/entertainers'
 import { waiterSystem } from './systems/waiterSystem'
+import { kingsTraySystem } from './systems/kingsTraySystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
 
@@ -113,6 +114,16 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
     customerWeights = { normal: 1.0, hooligan: nonGameDayHooligan, rich: richWeight, drunk: drunkWeight }
   }
 
+  // MBW-109: Noble's Visit — populate king's tray (3 random drinks, king arrives at Night start)
+  let kingsTray: DayConfig['kingsTray'] = null
+  if (event === 'NOBLES_VISIT' && save.unlockedDrinks.length > 0) {
+    const shuffled = [...save.unlockedDrinks].sort(() => Math.random() - 0.5)
+    kingsTray = {
+      drinks: shuffled.slice(0, Math.min(3, shuffled.length)),
+      arrivalTime: 90, // King arrives at Night phase start
+    }
+  }
+
   return {
     dayNumber: save.dayNumber,
     event,
@@ -131,6 +142,7 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
       hooliganFilterChance,
     },
     customerWeights,
+    kingsTray,
   }
 }
 
@@ -278,6 +290,8 @@ class GameLoop {
     entertainerSystem.tick(dt)
     // MBW-182: Advance waiter NPC pathfinding
     waiterSystem.update(dt)
+    // MBW-109: Advance king's tray countdown
+    kingsTraySystem.tick(dt)
 
     useHudStore.setState({
       timeRemaining,
@@ -361,6 +375,7 @@ class GameLoop {
       coinsEarned: Math.max(0, coinsEarned),
       starRatingDelta,
       finalRating: this.starRating,
+      eventType: this.dayConfig?.event ?? null,  // MBW-112: pass event for review tag matching
     })
 
     this.stop()

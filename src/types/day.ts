@@ -41,4 +41,6 @@ export interface DayConfig {
     rich: number    // MBW-93: scales with prestige upgrades owned
     drunk: number   // MBW-95: low constant after Day 5
   }
+  // MBW-109: Noble's Visit — king's tray mechanic (null on other days)
+  kingsTray: { drinks: string[]; arrivalTime: number } | null
 }

@@ -293,7 +293,7 @@ const STAGE_UPGRADE: UpgradeConfig = {
       description: 'A small performance stage. Entertainers can now be hired each evening.',
     },
   ],
-  visualPlacement: { x: 187, y: 160 },
+  visualPlacement: { x: 65, y: 565 },  // MBW-161: matches STAGE_POSITION in barLayout
   placeholderColor: 0x4a3a20,
 }
 

@@ -2,6 +2,7 @@
 // MBW-15: Drink taps (placeholder circles, interactive)
 // MBW-16: Seats and tables (placeholder rectangles)
 // MBW-42: Render owned upgrades as placeholder sprites
+// MBW-161: Stage area rendered when Stage upgrade is owned
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import {
@@ -14,6 +15,8 @@ import {
   TAP_Y,
   TAP_POSITIONS_X,
   DOORWAY,
+  STAGE_POSITION,
+  STAGE_AREA,
 } from '../../config/barLayout'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { UPGRADES_BY_ID } from '../../config/upgrades'
@@ -47,12 +50,15 @@ class BarScene {
   private seatGraphics: Map<string, Graphics> = new Map()
   private selectedDrinkId: string | null = null
 
-  init(app: Application, unlockedDrinkIds: string[], ownedUpgradeIds: string[] = []): void {
+  // MBW-147/159/160: extraSeatTier gates which tables/seats are rendered
+  // MBW-161: ownedUpgradeIds drives stage visibility
+  init(app: Application, unlockedDrinkIds: string[], ownedUpgradeIds: string[] = [], extraSeatTier = 0): void {
     this.root = new Container()
     app.stage.addChild(this.root)
 
     this.drawBackground()
-    this.drawSeatsAndTables()
+    if (ownedUpgradeIds.includes('stage')) this.drawStage()
+    this.drawSeatsAndTables(extraSeatTier)
     this.drawTaps(unlockedDrinkIds)
     this.drawUpgrades(ownedUpgradeIds)
   }
@@ -86,12 +92,35 @@ class BarScene {
     this.root.addChild(doorway)
   }
 
+  // MBW-161: Stage area at bottom-left — visible when Stage upgrade is owned
+  private drawStage(): void {
+    if (!this.root) return
+    const { width, height } = STAGE_AREA
+    const { x, y } = STAGE_POSITION
+
+    // Stage platform
+    const platform = new Graphics()
+    platform.rect(x - width / 2, y - height / 2, width, height)
+    platform.fill({ color: 0x3a2808 })
+    platform.stroke({ color: 0x8b6331, width: 2 })
+    this.root.addChild(platform)
+
+    // Stage label
+    const labelStyle = new TextStyle({ fontSize: 7, fill: 0xb89060, fontFamily: 'Georgia, serif' })
+    const label = new Text({ text: 'STAGE', style: labelStyle })
+    label.anchor.set(0.5)
+    label.position.set(x, y)
+    this.root.addChild(label)
+  }
+
   // MBW-16: Placeholder seats and tables
-  private drawSeatsAndTables(): void {
+  // MBW-147/159/160: Filter by extraSeatTier — only render seats/tables available at current tier
+  private drawSeatsAndTables(extraSeatTier = 0): void {
     if (!this.root) return
 
     // Tables
     for (const table of TABLES) {
+      if (table.upgradeRequired !== null && table.upgradeRequired > extraSeatTier) continue
       const g = new Graphics()
       g.rect(
         table.position.x - table.width / 2,
@@ -105,6 +134,7 @@ class BarScene {
 
     // Seats
     for (const seat of SEATS) {
+      if (seat.upgradeRequired !== null && seat.upgradeRequired > extraSeatTier) continue
       const g = new Graphics()
       const size = seat.type === 'bar_stool' ? 16 : 14
       g.rect(-size / 2, -size / 2, size, size)
@@ -124,6 +154,12 @@ class BarScene {
       fill: COLORS.tapLabel,
       fontFamily: 'Georgia, serif',
     })
+    const keyStyle = new TextStyle({
+      fontSize: 8,
+      fill: 0xffffff,
+      fontFamily: 'Georgia, serif',
+      fontWeight: 'bold',
+    })
 
     unlockedDrinkIds.forEach((drinkId, index) => {
       if (index >= TAP_POSITIONS_X.length) return
@@ -139,15 +175,21 @@ class BarScene {
 
       // Tap circle
       const circle = new Graphics()
-      circle.circle(0, 0, 16)
+      circle.circle(0, 0, 12)
       circle.fill({ color: drink.placeholderColor })
       circle.stroke({ color: COLORS.tapDefault, width: 2 })
       container.addChild(circle)
 
+      // MBW-163: Key number label inside circle
+      const keyLabel = new Text({ text: String(index + 1), style: keyStyle })
+      keyLabel.anchor.set(0.5)
+      keyLabel.position.set(0, 0)
+      container.addChild(keyLabel)
+
       // Drink name label
       const label = new Text({ text: drink.name, style: labelStyle })
       label.anchor.set(0.5, 0)
-      label.position.set(0, 20)
+      label.position.set(0, 15)
       container.addChild(label)
 
       container.on('pointerdown', () => {
@@ -168,7 +210,7 @@ class BarScene {
         prev.circle.clear()
         const drink = DRINKS_BY_ID[this.selectedDrinkId]
         if (drink) {
-          prev.circle.circle(0, 0, 16)
+          prev.circle.circle(0, 0, 12)
           prev.circle.fill({ color: drink.placeholderColor })
           prev.circle.stroke({ color: COLORS.tapDefault, width: 2 })
         }
@@ -183,7 +225,7 @@ class BarScene {
       const drink = DRINKS_BY_ID[drinkId]
       if (tap && drink) {
         tap.circle.clear()
-        tap.circle.circle(0, 0, 18)
+        tap.circle.circle(0, 0, 14)
         tap.circle.fill({ color: drink.placeholderColor })
         tap.circle.stroke({ color: COLORS.tapSelected, width: 3 })
       }

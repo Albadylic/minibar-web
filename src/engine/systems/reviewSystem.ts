@@ -1,7 +1,17 @@
 // MBW-60: Tag-based review selection — derives performance tags from DayResult,
 // filters the review bank, and picks one message at random.
+// MBW-112: Event-specific tags injected when an event was active.
 import type { DayResult, ReviewTag, ReviewEntry } from '../../types/review'
+import type { EventType } from '../../types/day'
 import { REVIEWS } from '../../config/reviews'
+
+const EVENT_TAG_MAP: Record<EventType, ReviewTag> = {
+  GAME_DAY: 'game_day',
+  MARKET_DAY: 'market_day',
+  NOBLES_VISIT: 'kings_visit',
+  HARVEST_FESTIVAL: 'harvest_festival',
+  BARD_NIGHT: 'bard_night',
+}
 
 function getTagsForResult(result: DayResult): ReviewTag[] {
   const tags: ReviewTag[] = ['generic']
@@ -14,6 +24,8 @@ function getTagsForResult(result: DayResult): ReviewTag[] {
   if (result.wrongDrinks > 0) tags.push('wrong_drinks')
   if (result.starRatingDelta > 0.1) tags.push('improving')
   if (result.starRatingDelta < -0.2) tags.push('declining')
+  // MBW-112: Event tag — lets event-specific reviews surface on the right day
+  if (result.eventType) tags.push(EVENT_TAG_MAP[result.eventType])
 
   return tags
 }

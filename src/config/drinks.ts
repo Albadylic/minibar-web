@@ -70,7 +70,16 @@ export const DRINKS: DrinkConfig[] = [
     placeholderColor: 0x8b1a3a,
     customerAffinities: { normal: 0.6, rich: 1.0 },
   },
-  // MBW-102: Tier 3 drinks — high value, favoured by rich clientele
+  // MBW-85/102: Tier 3 drinks — high value; hooligans love whisky, rich favour brandy/champagne
+  {
+    id: 'whisky',
+    name: 'Whisky',
+    tier: 3,
+    unlockDay: 15,
+    coinReward: 12,
+    placeholderColor: 0xd4902a,
+    customerAffinities: { normal: 0.5, hooligan: 1.4, rich: 0.8 },
+  },
   {
     id: 'brandy',
     name: 'Brandy',

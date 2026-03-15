@@ -112,7 +112,5 @@ export function computeDecayMult(cfg: EntertainerConfig, level: number, customer
   return Math.max(0.5, base - improvement)
 }
 
-// Stage position — left-center of floor, away from tables and doorway
-export const STAGE_POSITION = { x: 187, y: 500 } as const
-// MBW-120: Where entertainer walks to collect their tip
-export const BAR_TIP_POSITION = { x: 187, y: 160 } as const
+// MBW-161: STAGE_POSITION moved to barLayout.ts — re-export for backward compatibility
+export { STAGE_POSITION, BAR_TIP_POSITION } from './barLayout'

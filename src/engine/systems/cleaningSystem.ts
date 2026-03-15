@@ -33,6 +33,8 @@ class CleaningSystem {
   private messDisplays = new Map<string, Graphics>()
   private cleanerGraphic: Graphics | null = null
   private cleaner: CleanerState = { active: false, position: { ...CLEANER_START }, targetMessId: null, speed: 80, noIdlePause: false, idlePauseRemaining: 0 }
+  // MBW-167: Seats blocked because they have a mess on them
+  private blockedSeatIds = new Set<string>()
 
   init(app: Application, cleanerSpeed: number | null, noIdlePause = false): void {
     this.stage = new Container()
@@ -59,6 +61,7 @@ class CleaningSystem {
     this.stage = null
     this.messDisplays.clear()
     this.messes = []
+    this.blockedSeatIds.clear()
     this.cleanerGraphic = null
     this.cleaner.active = false
   }
@@ -66,9 +69,15 @@ class CleaningSystem {
   reset(): void {
     this.messes = []
     this.messDisplays.clear()
+    this.blockedSeatIds.clear()
     this.cleaner.position = { ...CLEANER_START }
     this.cleaner.targetMessId = null
     this.cleaner.idlePauseRemaining = 0
+  }
+
+  // MBW-167: Returns true if a seat is blocked by an uncleaned mess
+  isBlocked(seatId: string): boolean {
+    return this.blockedSeatIds.has(seatId)
   }
 
   // MBW-166: Glass left at seat when customer leaves (bar counter for stools, table surface for chairs)
@@ -94,15 +103,17 @@ class CleaningSystem {
       glassY = table ? table.position.y : seat.position.y - 20
     }
 
-    this.spawnMess(glassX, glassY)
+    this.spawnMess(glassX, glassY, customer.seatId)
   }
 
-  private spawnMess(x: number, y: number): void {
+  private spawnMess(x: number, y: number, seatId: string | null = null): void {
     // Clamp to floor area
     const clampedX = Math.max(10, Math.min(CANVAS_WIDTH - 10, x))
     const clampedY = Math.max(FLOOR_TOP + 5, Math.min(FLOOR_BOTTOM - 5, y))
 
-    const mess: MessEntity = { id: nextMessId(), position: { x: clampedX, y: clampedY } }
+    const mess: MessEntity = { id: nextMessId(), position: { x: clampedX, y: clampedY }, seatId }
+    // MBW-167: Block the associated seat
+    if (seatId) this.blockedSeatIds.add(seatId)
     this.messes.push(mess)
 
     if (!this.stage) return
@@ -124,6 +135,9 @@ class CleaningSystem {
   cleanMess(messId: string): void {
     const idx = this.messes.findIndex((m) => m.id === messId)
     if (idx === -1) return
+    const mess = this.messes[idx]!
+    // MBW-167: Unblock the seat when mess is cleaned
+    if (mess.seatId) this.blockedSeatIds.delete(mess.seatId)
     this.messes.splice(idx, 1)
 
     const g = this.messDisplays.get(messId)

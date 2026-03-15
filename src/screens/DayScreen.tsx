@@ -3,10 +3,10 @@
 // MBW-13/15/16: Bar scene
 // MBW-26/27/28: Drink serving system
 // MBW-30: Drink unlock progression
+// MBW-70: Loading screen while PixiJS initialises
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useHudStore } from '../store/hudStore'
-import { entertainerSystem } from '../engine/systems/entertainerSystem'
 import { gameLoop, generateDayConfig } from '../engine/gameLoop'
 import { pixiApp } from '../engine/renderer/pixiApp'
 import { barScene } from '../engine/renderer/barScene'
@@ -18,12 +18,17 @@ import { securitySystem } from '../engine/systems/securitySystem'
 import { cleaningSystem } from '../engine/systems/cleaningSystem'
 import { entertainerSystem } from '../engine/systems/entertainerSystem'
 import { waiterSystem } from '../engine/systems/waiterSystem'
+import { customerSystem } from '../engine/systems/customerSystem'
+import { kingsTraySystem } from '../engine/systems/kingsTraySystem'
 import { getUnlockedDrinks } from '../config/drinks'
 import { UPGRADES_BY_ID } from '../config/upgrades'
+import { eventDispatcher } from '../engine/events/eventDispatcher'
 
 export function DayScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { gameSave, updateSave } = useGameStore()
+  // MBW-70: Track PixiJS init state so we can show loading overlay
+  const [pixiReady, setPixiReady] = useState(false)
 
   // Start game loop on mount — also handles drink unlock check (MBW-30)
   useEffect(() => {
@@ -40,6 +45,9 @@ export function DayScreen() {
     // MBW-83: pendingEvent was rolled in ShopScreen; pass it to DayConfig
     const dayConfig = generateDayConfig(save, pendingEvent)
     gameLoop.start(dayConfig, save.coins, save.starRating, unlockedDrinks)
+    // MBW-147/160: Extra Seating upgrade tier controls which seats are active
+    const extraSeatTier = save.upgrades['extra_seating']?.tier ?? 0
+    customerSystem.setExtraSeatTier(extraSeatTier)
     brawlSystem.init(save.dayNumber)
     const bouncerTier = (save.upgrades['bouncer']?.tier ?? 0) as 0 | 1 | 2 | 3
     securitySystem.init(bouncerTier)
@@ -68,6 +76,8 @@ export function DayScreen() {
       : save.unlockedDrinks
 
     const ownedUpgrades = Object.keys(save.upgrades)
+    // MBW-147/160: Extra Seating tier for barScene seat/table rendering
+    const extraSeatTier = save.upgrades['extra_seating']?.tier ?? 0
 
     // MBW-101/179: Cleaner speed from owned upgrade tier (null = no cleaner NPC)
     const cleanerTier = save.upgrades['cleaner']?.tier ?? 0
@@ -80,9 +90,25 @@ export function DayScreen() {
     // MBW-179: Tier 3 cleaner starts next mess without idle pause
     const cleanerNoIdlePause = cleanerTier >= 3
 
+    // MBW-163: Number keys 1–9 select drinks; same key deselects
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const num = parseInt(e.key, 10)
+      if (isNaN(num) || num < 1 || num > 9) return
+      const drinkId = unlockedDrinks[num - 1]
+      if (!drinkId) return
+      eventDispatcher.emit('DRINK_CLICKED', { drinkId })
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
     pixiApp.init(canvas).then(() => {
       if (cancelled || !pixiApp.app) return
-      barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades)
+      setPixiReady(true)
+      barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades, extraSeatTier)
+      // MBW-109: Noble's Visit king's tray mechanic
+      const kingsTray = gameLoop.state.dayConfig?.kingsTray
+      if (kingsTray) {
+        kingsTraySystem.init(pixiApp.app, kingsTray)
+      }
       customerRenderer.init(pixiApp.app)
       flyupRenderer.init(pixiApp.app) // MBW-67
       cleaningSystem.init(pixiApp.app, cleanerSpeed, cleanerNoIdlePause) // MBW-101/179
@@ -99,7 +125,9 @@ export function DayScreen() {
 
     return () => {
       cancelled = true
+      window.removeEventListener('keydown', handleKeyDown)
       flyupRenderer.destroy()
+      kingsTraySystem.destroy()
       cleaningSystem.destroy()
       entertainerSystem.destroy()
       waiterSystem.destroy()
@@ -116,10 +144,22 @@ export function DayScreen() {
   return (
     <div className="day-screen-wrapper">
       <canvas ref={canvasRef} className="game-canvas" />
+      {/* MBW-70: Loading overlay until PixiJS is ready */}
+      {!pixiReady && <PixiLoadingOverlay />}
       <div className="hud-overlay">
         <DayHud dayNumber={gameSave.dayNumber} />
       </div>
       <TipPromptOverlay />
+    </div>
+  )
+}
+
+// MBW-70: Themed loading overlay shown while PixiJS Application initialises.
+// When V1.5 sprite sheets are added, wire Assets.load() progress into this component.
+function PixiLoadingOverlay() {
+  return (
+    <div className="pixi-loading-overlay">
+      <p className="pixi-loading-text">Opening the doors<span className="pixi-loading-dots" /></p>
     </div>
   )
 }
@@ -176,11 +216,17 @@ function TipPromptOverlay() {
 }
 
 function DayHud({ dayNumber }: { dayNumber: number }) {
-  const { timeRemaining, phase, coins, starRating, performingEntertainer } = useHudStore()
+  const { timeRemaining, coins, starRating, performingEntertainer } = useHudStore()
 
   const minutes = Math.floor(timeRemaining / 60)
   const seconds = Math.floor(timeRemaining % 60)
   const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+  // MBW-157: Game clock: 120s → 12:00, 0s → 00:00 (1 real second = 6 game minutes)
+  const gameTotalMins = Math.floor(timeRemaining) * 6
+  const gameHours = Math.floor(gameTotalMins / 60)
+  const gameMins = gameTotalMins % 60
+  const clockStr = `${gameHours.toString().padStart(2, '0')}:${gameMins.toString().padStart(2, '0')}`
 
   // MBW-154: Escalating urgency animation below 24s / 10s / 5s
   const timerClass =
@@ -192,7 +238,7 @@ function DayHud({ dayNumber }: { dayNumber: number }) {
     <div className="hud">
       <span className="hud-day">Day {dayNumber}</span>
       <span className={`hud-timer ${timerClass}`}>{timeStr}</span>
-      <span className="hud-phase">{phase}</span>
+      <span className="hud-clock">{clockStr}</span>
       <StarRating rating={starRating} />
       <span className="hud-coins">🪙 {coins}</span>
       {performingEntertainer && (

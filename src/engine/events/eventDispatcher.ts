@@ -38,6 +38,10 @@ export type GameEventMap = {
   ENTERTAINER_ARRIVED: { entertainerId: string }
   ENTERTAINER_TIPPED: { entertainerId: string; amount: number }
   ENTERTAINER_LEFT: { entertainerId: string }
+
+  // MBW-109: Noble's Visit — king's tray mechanic
+  KINGS_TRAY_SLOT_FILLED: { slotIndex: number; drinkId: string }
+  KINGS_TRAY_RESOLVED: { complete: boolean; coinsEarned: number }
 }
 
 type EventHandler<T> = (payload: T) => void

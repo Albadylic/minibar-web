@@ -23,12 +23,14 @@ export function getPatienceMultiplierForDay(dayNumber: number): number {
   return Math.max(1 - (dayNumber - 1) * 0.015, 0.7)
 }
 
-// MBW-81: Brawl escalation config — radius and tap requirements scale with day number
+// MBW-81/150: Brawl config — tap requirements scale with day number; roaming speed is fixed
 export const BRAWL = {
-  autoResolveFallback: 12,  // seconds before brawl resolves on its own (bad outcome)
+  autoResolveFallback: 20,  // seconds before brawl resolves on its own (longer — gives player time to chase)
   tapsRequiredBase: 5,      // taps to eject on day 1
   tapsRequiredMax: 9,       // capped at this value
-  starLossPerCasualty: 0.12, // star rating hit per affected customer
+  starLossPerCasualty: 0.12, // star rating hit per disrupted customer
+  walkSpeed: 70,            // MBW-150: brawler roam speed in px/s
+  roamCooldown: 1.5,        // MBW-150: pause (seconds) after disrupting a seat before picking next target
 } as const
 
 export function getBrawlTapsRequired(dayNumber: number): number {
@@ -37,11 +39,6 @@ export function getBrawlTapsRequired(dayNumber: number): number {
     BRAWL.tapsRequiredBase + Math.floor((dayNumber - 1) / 3),
     BRAWL.tapsRequiredMax,
   )
-}
-
-export function getBrawlRadius(dayNumber: number): number {
-  // Base radius from customer config; grows +5px every 2 days, capped at 110
-  return Math.min(60 + Math.floor((dayNumber - 1) / 2) * 5, 110)
 }
 
 // Star rating balance
@@ -56,9 +53,8 @@ export const STAR_RATING = {
   lossPerHarshReview: 0.28,  // MBW-94: rich customer leaves unhappy — significantly worse
 } as const
 
-// MBW-99: Mess spawning — probability per DRINK_SERVED or CUSTOMER_LEFT event
+// MBW-99: Mess spawning — glasses appear only when a customer leaves (not on serve)
 export const MESS = {
-  spawnChancePerServe: 0.25,  // 25% chance a mess spawns after each successful serve
   spawnChanceOnLeave: 0.15,   // 15% chance a mess spawns when customer leaves
   maxMesses: 8,               // cap to avoid screen clutter
 } as const
@@ -70,10 +66,3 @@ export const COIN_REWARDS = {
   tier3: 12, // Whisky, Brandy, Champagne (V2.0+)
 } as const
 
-// Bar layout
-export const BAR = {
-  initialCapacity: 13,
-  barStoolCount: 5,
-  tableCount: 4,
-  chairsPerTable: 2,
-} as const

@@ -129,7 +129,7 @@ export function ShopScreen() {
         {isMaxed ? (
           <div className="upgrade-owned">✓ Maxed</div>
         ) : tierConfig ? (
-          <>
+          <div className="upgrade-card-body">
             <div className="upgrade-desc">{tierConfig.description}</div>
             <button
               className="upgrade-buy"
@@ -139,7 +139,7 @@ export function ShopScreen() {
             >
               🪙 {tierConfig.cost}
             </button>
-          </>
+          </div>
         ) : null}
       </div>
     )

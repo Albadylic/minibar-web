@@ -16,6 +16,7 @@ import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { STAR_RATING } from '../../config/difficulty'
 import { entertainerSystem } from './entertainerSystem'
+import { cleaningSystem } from './cleaningSystem'
 
 class CustomerSystem {
   customers: CustomerEntity[] = []
@@ -23,6 +24,8 @@ class CustomerSystem {
   private timeSinceLastSpawn = 0
   // MBW-56: Store unlocked drinks so reorders stay within unlocked set
   private unlockedDrinks: string[] = []
+  // MBW-147/160: Extra Seating upgrade tier gates which seats customers can use
+  private extraSeatTier = 0
 
   reset(): void {
     this.customers = []
@@ -30,6 +33,11 @@ class CustomerSystem {
     this.timeSinceLastSpawn = 0
     this.unlockedDrinks = []
     resetCustomerIdCounter()
+  }
+
+  // MBW-147/160: Called from DayScreen after game loop starts with the player's Extra Seating tier
+  setExtraSeatTier(tier: number): void {
+    this.extraSeatTier = tier
   }
 
   // Main update — called each fixed tick from the game loop
@@ -116,7 +124,14 @@ class CustomerSystem {
   }
 
   private pickAvailableSeat(): (typeof SEATS)[number] | null {
-    const available = SEATS.filter((s) => !this.occupiedSeatIds.has(s.id))
+    // MBW-167: Exclude seats blocked by uncleaned glasses
+    // MBW-147/160: Exclude seats that require a higher Extra Seating tier than the player owns
+    const available = SEATS.filter(
+      (s) =>
+        !this.occupiedSeatIds.has(s.id) &&
+        !cleaningSystem.isBlocked(s.id) &&
+        (s.upgradeRequired === null || s.upgradeRequired <= this.extraSeatTier),
+    )
     if (available.length === 0) return null
     return available[Math.floor(Math.random() * available.length)]!
   }
@@ -330,6 +345,13 @@ class CustomerSystem {
 
   // MBW-80: Called by brawl system to eject brawling customers regardless of current status
   forceLeaveBrawl(customerId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    this.startLeaving(customer)
+  }
+
+  // MBW-150: Called when brawler reaches a seat — cancels that customer's order and ejects them
+  disruptByBrawler(customerId: string): void {
     const customer = this.customers.find((c) => c.id === customerId)
     if (!customer) return
     this.startLeaving(customer)

@@ -1,5 +1,6 @@
 // MBW-20: Customer sprite rendering + click/tap detection
 // MBW-80: BRAWLING state — hooligan is tappable, shows eject progress bar
+// MBW-132: Accessibility — patience bar adds size + motion cues beyond colour
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import type { CustomerEntity } from '../../entities/customer'
@@ -12,6 +13,10 @@ import { brawlSystem } from '../systems/brawlSystem'
 const BODY_RADIUS = 14
 const PATIENCE_BAR_WIDTH = 32
 const PATIENCE_BAR_HEIGHT = 4
+// MBW-132: Critical patience bar grows taller to provide a size cue beyond colour
+const PATIENCE_BAR_HEIGHT_CRITICAL = 6
+// MBW-132: Pulse frequency for the critical bar flicker (radians/ms)
+const PATIENCE_PULSE_FREQ = 0.008
 
 interface CustomerDisplayObjects {
   root: Container
@@ -153,16 +158,27 @@ class CustomerRenderer {
     if (showPatience) {
       const ratio = Math.max(0, customer.patienceTimer / customer.patienceMax)
       const fillWidth = PATIENCE_BAR_WIDTH * ratio
+      const isCritical = ratio <= 0.3
       const barColor = ratio > 0.6 ? 0x44cc44 : ratio > 0.3 ? 0xddcc00 : 0xcc2222
+      // MBW-132: Taller bar at critical patience (size cue beyond colour)
+      const barHeight = isCritical ? PATIENCE_BAR_HEIGHT_CRITICAL : PATIENCE_BAR_HEIGHT
 
       patienceBarBg.clear()
-      patienceBarBg.rect(0, 0, PATIENCE_BAR_WIDTH, PATIENCE_BAR_HEIGHT)
-      patienceBarBg.fill({ color: 0x222222 })
+      patienceBarBg.rect(0, 0, PATIENCE_BAR_WIDTH, barHeight)
+      // MBW-132: Slightly lighter background for better contrast
+      patienceBarBg.fill({ color: 0x333333 })
 
       patienceBar.clear()
       if (fillWidth > 0) {
-        patienceBar.rect(0, 0, fillWidth, PATIENCE_BAR_HEIGHT)
+        patienceBar.rect(0, 0, fillWidth, barHeight)
         patienceBar.fill({ color: barColor })
+      }
+      // MBW-132: Pulse alpha when critical — motion cue independent of colour vision
+      if (isCritical) {
+        const pulse = 0.65 + 0.35 * Math.sin(performance.now() * PATIENCE_PULSE_FREQ)
+        patienceBar.alpha = pulse
+      } else {
+        patienceBar.alpha = 1
       }
     }
 
