@@ -14,6 +14,7 @@ export interface UpgradeEffect {
     | 'reduce_drunk_spawn'  // MBW-181: Doorman tier 1 — fewer drunks enter (value = spawn multiplier)
     | 'filter_hooligan'     // MBW-181: Doorman tier 2 — chance to turn away hooligans at door (value = probability)
     | 'rich_patience_boost' // MBW-181: Doorman tier 3 — rich clientele patience boost on entry (value = multiplier)
+    | 'waiter'              // MBW-182: Waiter NPC — autonomous drink serving (value = tier: 1/2/3)
   value: number
 }
 
@@ -349,6 +350,34 @@ const DOORMAN_UPGRADE: UpgradeConfig = {
   placeholderColor: 0x223322,
 }
 
+// MBW-182: Waiter — autonomous NPC that fetches and delivers drinks to waiting customers
+const WAITER_UPGRADE: UpgradeConfig = {
+  id: 'waiter',
+  name: 'Waiter',
+  category: 'staff',
+  maxTier: 3,
+  minDay: 8,
+  tiers: [
+    {
+      cost: 300,
+      effects: [{ type: 'waiter', value: 1 }],
+      description: 'A waiter serves 1 customer at a time. Walks bar → table → back.',
+    },
+    {
+      cost: 500,
+      effects: [{ type: 'waiter', value: 2 }],
+      description: 'Handles 2 orders simultaneously at faster walking speed.',
+    },
+    {
+      cost: 750,
+      effects: [{ type: 'waiter', value: 3 }],
+      description: 'Handles 3 orders. Fastest speed. Prioritises lowest-patience customers.',
+    },
+  ],
+  visualPlacement: { x: 344, y: 570 },
+  placeholderColor: 0x44a899,
+}
+
 UPGRADES.push(
   BOUNCER_UPGRADE,
   CLEANER_UPGRADE,
@@ -359,6 +388,7 @@ UPGRADES.push(
   STAGE_UPGRADE,
   JUKEBOX_UPGRADE,
   DOORMAN_UPGRADE,
+  WAITER_UPGRADE,
 )
 
 export const UPGRADES_BY_ID = Object.fromEntries(UPGRADES.map((u) => [u.id, u]))

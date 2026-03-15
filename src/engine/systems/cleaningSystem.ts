@@ -9,7 +9,7 @@ import { nextMessId, resetMessIdCounter } from '../../entities/mess'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { customerSystem } from './customerSystem'
 import { MESS } from '../../config/difficulty'
-import { CANVAS_WIDTH, FLOOR_TOP, FLOOR_BOTTOM } from '../../config/barLayout'
+import { CANVAS_WIDTH, FLOOR_TOP, FLOOR_BOTTOM, SEATS_BY_ID, TABLES, BAR_COUNTER_BOTTOM } from '../../config/barLayout'
 
 const MESS_RADIUS = 5
 const CLEANER_RADIUS = 8
@@ -36,7 +36,8 @@ class CleaningSystem {
 
   init(app: Application, cleanerSpeed: number | null, noIdlePause = false): void {
     this.stage = new Container()
-    app.stage.addChildAt(this.stage, 1) // render below customers
+    // MBW-166: Render above customers so glasses are visible over seated patrons
+    app.stage.addChild(this.stage)
 
     if (cleanerSpeed !== null) {
       this.cleaner = { active: true, position: { ...CLEANER_START }, targetMessId: null, speed: cleanerSpeed, noIdlePause, idlePauseRemaining: 0 }
@@ -48,12 +49,11 @@ class CleaningSystem {
     }
 
     resetMessIdCounter()
-    eventDispatcher.on('DRINK_SERVED', this.handleDrinkServed)
+    // MBW-166: Glasses only appear on departure, not immediately after serving
     eventDispatcher.on('CUSTOMER_LEFT', this.handleCustomerLeft)
   }
 
   destroy(): void {
-    eventDispatcher.off('DRINK_SERVED', this.handleDrinkServed)
     eventDispatcher.off('CUSTOMER_LEFT', this.handleCustomerLeft)
     this.stage?.destroy({ children: true })
     this.stage = null
@@ -71,22 +71,30 @@ class CleaningSystem {
     this.cleaner.idlePauseRemaining = 0
   }
 
-  // MBW-99: Spilt drink mess after a successful serve
-  private handleDrinkServed = ({ customerId }: { customerId: string }): void => {
-    if (this.messes.length >= MESS.maxMesses) return
-    if (Math.random() > MESS.spawnChancePerServe) return
-    const customer = customerSystem.customers.find((c) => c.id === customerId)
-    if (!customer) return
-    this.spawnMess(customer.position.x + (Math.random() - 0.5) * 20, customer.position.y + 10)
-  }
-
-  // MBW-99: Empty glass left on table when customer leaves
+  // MBW-166: Glass left at seat when customer leaves (bar counter for stools, table surface for chairs)
   private handleCustomerLeft = ({ customerId }: { customerId: string }): void => {
     if (this.messes.length >= MESS.maxMesses) return
     if (Math.random() > MESS.spawnChanceOnLeave) return
     const customer = customerSystem.customers.find((c) => c.id === customerId)
     if (!customer) return
-    this.spawnMess(customer.position.x + (Math.random() - 0.5) * 15, customer.position.y)
+
+    const seat = SEATS_BY_ID[customer.seatId]
+    if (!seat) return
+
+    let glassX: number
+    let glassY: number
+    if (seat.type === 'bar_stool') {
+      // Place glass on the bar counter surface, above the stool
+      glassX = seat.position.x
+      glassY = BAR_COUNTER_BOTTOM - 8
+    } else {
+      // Place glass at the centre of the table the chair belongs to
+      const table = TABLES.find((t) => t.id === seat.tableId)
+      glassX = table ? table.position.x : seat.position.x
+      glassY = table ? table.position.y : seat.position.y - 20
+    }
+
+    this.spawnMess(glassX, glassY)
   }
 
   private spawnMess(x: number, y: number): void {
@@ -98,9 +106,10 @@ class CleaningSystem {
     this.messes.push(mess)
 
     if (!this.stage) return
+    // MBW-166: White circle represents a glass left on the bar/table
     const g = new Graphics()
     g.circle(0, 0, MESS_RADIUS)
-    g.fill({ color: 0x5c3d11 })
+    g.fill({ color: 0xf0f0f0 })
     g.position.set(clampedX, clampedY)
     g.eventMode = 'static'
     g.cursor = 'pointer'

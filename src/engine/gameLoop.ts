@@ -24,6 +24,7 @@ import { brawlSystem } from './systems/brawlSystem'
 import { securitySystem } from './systems/securitySystem'
 import { cleaningSystem } from './systems/cleaningSystem'
 import { entertainerSystem, computeUpdatedLikelihood } from './systems/entertainerSystem'
+import { waiterSystem } from './systems/waiterSystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
 
@@ -259,6 +260,8 @@ class GameLoop {
     cleaningSystem.tick(dt)
     // MBW-116: Advance entertainer walk animation
     entertainerSystem.tick(dt)
+    // MBW-182: Advance waiter NPC pathfinding
+    waiterSystem.update(dt)
 
     useHudStore.setState({
       timeRemaining,

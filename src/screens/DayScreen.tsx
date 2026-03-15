@@ -16,6 +16,7 @@ import { brawlSystem } from '../engine/systems/brawlSystem'
 import { securitySystem } from '../engine/systems/securitySystem'
 import { cleaningSystem } from '../engine/systems/cleaningSystem'
 import { entertainerSystem } from '../engine/systems/entertainerSystem'
+import { waiterSystem } from '../engine/systems/waiterSystem'
 import { getUnlockedDrinks } from '../config/drinks'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 
@@ -88,6 +89,11 @@ export function DayScreen() {
       if (save.upgrades['stage']) {
         entertainerSystem.init(pixiApp.app, save) // MBW-116
       }
+      // MBW-182: Waiter NPC
+      const waiterTier = save.upgrades['waiter']?.tier ?? 0
+      if (waiterTier > 0) {
+        waiterSystem.init(pixiApp.app, waiterTier as 1 | 2 | 3)
+      }
     })
 
     return () => {
@@ -95,6 +101,7 @@ export function DayScreen() {
       flyupRenderer.destroy()
       cleaningSystem.destroy()
       entertainerSystem.destroy()
+      waiterSystem.destroy()
       customerRenderer.destroy()
       barScene.destroy()
       pixiApp.destroy()
