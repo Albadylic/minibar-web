@@ -478,7 +478,7 @@
   border-bottom: 1px solid #5c3d11;
 }
 
-.shop-tab {
+.shop-tabs .shop-tab {
   flex: 1;
   padding: 7px 0;
   font-size: 0.85rem;
@@ -491,11 +491,11 @@
   min-width: unset;
 }
 
-.shop-tab:hover {
+.shop-tabs .shop-tab:hover {
   background: rgba(92, 61, 17, 0.25);
 }
 
-.shop-tab.active {
+.shop-tabs .shop-tab.active {
   color: #f5e6c8;
   border-bottom-color: #8b6331;
   background: transparent;

@@ -55,8 +55,8 @@ export const STAR_RATING = {
 
 // MBW-99: Mess spawning — glasses appear only when a customer leaves (not on serve)
 export const MESS = {
-  spawnChanceOnLeave: 0.15,   // 15% chance a mess spawns when customer leaves
-  maxMesses: 8,               // cap to avoid screen clutter
+  spawnChanceOnLeave: 1.0,    // every customer leaves a glass behind
+  maxMesses: 20,              // cap raised to match potential seat count with upgrades
 } as const
 
 // Coin rewards per drink tier

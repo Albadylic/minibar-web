@@ -58,7 +58,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 2,
     unlockDay: 10,
     coinReward: 8,
-    placeholderColor: 0xe8b84b,
+    placeholderColor: 0xb5721e, // MBW-155: deep amber/honey — distinct from Lager's pale gold
     customerAffinities: { normal: 0.7 },
   },
   {

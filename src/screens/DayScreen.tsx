@@ -228,16 +228,10 @@ function DayHud({ dayNumber }: { dayNumber: number }) {
   const gameMins = gameTotalMins % 60
   const clockStr = `${gameHours.toString().padStart(2, '0')}:${gameMins.toString().padStart(2, '0')}`
 
-  // MBW-154: Escalating urgency animation below 24s / 10s / 5s
-  const timerClass =
-    timeRemaining < 5 ? 'timer-frantic' :
-    timeRemaining < 10 ? 'timer-erratic' :
-    timeRemaining < 24 ? 'timer-urgent' : ''
-
   return (
     <div className="hud">
       <span className="hud-day">Day {dayNumber}</span>
-      <span className={`hud-timer ${timerClass}`}>{timeStr}</span>
+      <span className="hud-timer">{timeStr}</span>
       <span className="hud-clock">{clockStr}</span>
       <StarRating rating={starRating} />
       <span className="hud-coins">🪙 {coins}</span>

@@ -152,11 +152,20 @@ class CustomerRenderer {
 
     // Patience bar — visible only when WAITING
     const showPatience = customer.status === 'WAITING'
+    const patienceRatio = customer.patienceMax > 0 ? customer.patienceTimer / customer.patienceMax : 1
     patienceBarBg.visible = showPatience
     patienceBar.visible = showPatience
 
+    // Shake the drink order indicator when patience is critical (<=30%)
+    if (showDrinkOrder && patienceRatio <= 0.3) {
+      const shake = Math.sin(performance.now() * 0.03) * 2.5
+      drinkIndicator.position.set(shake, -BODY_RADIUS - 8)
+    } else {
+      drinkIndicator.position.set(0, -BODY_RADIUS - 8)
+    }
+
     if (showPatience) {
-      const ratio = Math.max(0, customer.patienceTimer / customer.patienceMax)
+      const ratio = Math.max(0, patienceRatio)
       const fillWidth = PATIENCE_BAR_WIDTH * ratio
       const isCritical = ratio <= 0.3
       const barColor = ratio > 0.6 ? 0x44cc44 : ratio > 0.3 ? 0xddcc00 : 0xcc2222
