@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useHudStore } from '../store/hudStore'
+import { entertainerSystem } from '../engine/systems/entertainerSystem'
 import { gameLoop, generateDayConfig } from '../engine/gameLoop'
 import { pixiApp } from '../engine/renderer/pixiApp'
 import { barScene } from '../engine/renderer/barScene'
@@ -118,6 +119,7 @@ export function DayScreen() {
       <div className="hud-overlay">
         <DayHud dayNumber={gameSave.dayNumber} />
       </div>
+      <TipPromptOverlay />
     </div>
   )
 }
@@ -141,6 +143,35 @@ function StarRating({ rating }: { rating: number }) {
     <span className={`hud-stars ${animClass}`} style={{ color }}>
       ★ {rating.toFixed(1)}
     </span>
+  )
+}
+
+// MBW-120: Tip prompt overlay — shown when entertainer reaches bar at Last Orders
+function TipPromptOverlay() {
+  const { tipPrompt, coins } = useHudStore()
+  if (!tipPrompt) return null
+
+  const labels = ['Generous', 'Adequate', 'Poor', 'Refuse']
+
+  return (
+    <div className="tip-overlay">
+      <div className="tip-card">
+        <p className="tip-title">{tipPrompt.entertainerName} wants paying</p>
+        <div className="tip-options">
+          {tipPrompt.options.map((amount, i) => (
+            <button
+              key={i}
+              className={`tip-btn tip-btn-${i}`}
+              disabled={amount > coins}
+              onClick={() => entertainerSystem.resolveTip(i as 0 | 1 | 2 | 3)}
+            >
+              <span className="tip-label">{labels[i]}</span>
+              <span className="tip-amount">{amount > 0 ? `🪙 ${amount}` : 'Nothing'}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

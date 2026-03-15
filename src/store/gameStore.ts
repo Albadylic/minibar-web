@@ -109,9 +109,23 @@ export const useGameStore = create<GameState>()(
       // Handle save version migrations
       version: SAVE_VERSION,
       migrate: (persistedState, version) => {
-        if (version < SAVE_VERSION) {
-          // Future migration logic goes here
-          return { gameSave: initialGameSave }
+        if (version < 2) {
+          // MBW-122: Add level/xp to existing entertainer save data
+          const ps = persistedState as { gameSave: GameSave }
+          const ents = ps.gameSave?.entertainers
+          if (ents) {
+            for (const key of ['jinx', 'roland', 'melody'] as const) {
+              const e = ents[key]
+              if (e) {
+                ents[key] = {
+                  ...e,
+                  level: (e as { level?: number }).level ?? 1,
+                  xp: (e as { xp?: number }).xp ?? 0,
+                }
+              }
+            }
+          }
+          return ps
         }
         return persistedState as { gameSave: GameSave }
       },

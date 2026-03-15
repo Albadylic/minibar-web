@@ -23,7 +23,18 @@ import { GAME_DAY_CONFIG, EVENT_CONFIGS } from '../config/events'
 import { brawlSystem } from './systems/brawlSystem'
 import { securitySystem } from './systems/securitySystem'
 import { cleaningSystem } from './systems/cleaningSystem'
-import { entertainerSystem, computeUpdatedLikelihood } from './systems/entertainerSystem'
+import { entertainerSystem } from './systems/entertainerSystem'
+import {
+  ENTERTAINER_CONFIGS,
+  XP_GENEROUS_BONUS,
+  XP_ADEQUATE_BONUS,
+  ADEQUATE_TIP_LIKELIHOOD_BONUS,
+  GENEROUS_TIP_LIKELIHOOD_BONUS,
+  NO_TIP_PENALTY,
+  MIN_LIKELIHOOD,
+  MAX_LIKELIHOOD,
+  computeNewLevel,
+} from '../config/entertainers'
 import { waiterSystem } from './systems/waiterSystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
@@ -236,8 +247,13 @@ class GameLoop {
       eventDispatcher.emit('LAST_ORDERS', {})
     }
 
-    // Day end
+    // Day end — MBW-120: block if entertainer is waiting at bar for tip
     if (this.timeElapsed >= DAY_DURATION) {
+      if (entertainerSystem.isWaitingForTip) {
+        // Keep entertainer walking/waiting; freeze all other simulation
+        entertainerSystem.tick(dt)
+        return
+      }
       this.dayEndedFired = true
       this.endDay()
       return
@@ -291,13 +307,35 @@ class GameLoop {
 
     const { gameSave, updateSave, goToScreen } = useGameStore.getState()
 
-    // MBW-121: Update entertainer return likelihoods based on whether the player tipped
+    // MBW-121/122: Update entertainer likelihoods, XP, and level based on tip choice
     const tipResult = entertainerSystem.getTipResult()
     const updatedEntertainers = { ...gameSave.entertainers }
     if (tipResult) {
-      const current = gameSave.entertainers[tipResult.entertainerId].returnLikelihood
+      const cfg = ENTERTAINER_CONFIGS[tipResult.entertainerId]
+      const current = gameSave.entertainers[tipResult.entertainerId]
+      // Determine XP gain and likelihood delta from tip choice
+      let xpBonus = 0
+      let likelihoodDelta = -NO_TIP_PENALTY
+      switch (tipResult.tipChoice) {
+        case 0: // Generous
+          xpBonus = XP_GENEROUS_BONUS
+          likelihoodDelta = GENEROUS_TIP_LIKELIHOOD_BONUS
+          break
+        case 1: // Adequate
+          xpBonus = XP_ADEQUATE_BONUS
+          likelihoodDelta = ADEQUATE_TIP_LIKELIHOOD_BONUS
+          break
+        case 2: // Poor — no change
+          likelihoodDelta = 0
+          break
+        case 3: // Refuse — penalty
+          break
+      }
+      const newXp = current.xp + cfg.xpPerPerformance + xpBonus
       updatedEntertainers[tipResult.entertainerId] = {
-        returnLikelihood: computeUpdatedLikelihood(current, tipResult.tipped),
+        returnLikelihood: Math.max(MIN_LIKELIHOOD, Math.min(MAX_LIKELIHOOD, current.returnLikelihood + likelihoodDelta)),
+        level: computeNewLevel(newXp),
+        xp: newXp,
       }
     }
 

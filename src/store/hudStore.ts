@@ -3,6 +3,13 @@
 import { create } from 'zustand'
 import type { DayPhase } from '../types/day'
 
+// MBW-120: Tip prompt shown when entertainer reaches bar at Last Orders
+export interface TipPrompt {
+  entertainerId: string
+  entertainerName: string
+  options: [number, number, number, number]  // Generous, Adequate, Poor, Refuse amounts
+}
+
 interface HudState {
   timeRemaining: number
   phase: DayPhase
@@ -10,6 +17,7 @@ interface HudState {
   starRating: number
   selectedDrinkId: string | null
   performingEntertainer: string | null  // MBW-116: null = no performer
+  tipPrompt: TipPrompt | null           // MBW-120: non-null = show tip prompt overlay
 }
 
 export const useHudStore = create<HudState>()(() => ({
@@ -19,4 +27,5 @@ export const useHudStore = create<HudState>()(() => ({
   starRating: 3.0,
   selectedDrinkId: null,
   performingEntertainer: null,
+  tipPrompt: null,
 }))

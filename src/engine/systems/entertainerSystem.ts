@@ -1,8 +1,7 @@
-// MBW-116/121: Entertainer arrival, performance, tip, and return likelihood
+// MBW-116/121/122/120: Entertainer arrival, performance, tipping, levelling, return likelihood
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
-import type { EntertainerId, EntertainerEntity } from '../../entities/entertainer'
-import type { CustomerType } from '../../entities/customer'
+import type { EntertainerId, EntertainerEntity, TipChoice } from '../../entities/entertainer'
 import type { GameSave } from '../../types/game'
 import {
   ENTERTAINER_CONFIGS,
@@ -13,6 +12,9 @@ import {
   MIN_LIKELIHOOD,
   MAX_LIKELIHOOD,
   STAGE_POSITION,
+  BAR_TIP_POSITION,
+  computeEntertainerFee,
+  computeDecayMult,
 } from '../../config/entertainers'
 import { DOORWAY } from '../../config/barLayout'
 import { eventDispatcher } from '../events/eventDispatcher'
@@ -27,15 +29,16 @@ class EntertainerSystem {
   private stage: Container | null = null
   private graphic: Graphics | null = null
   private label: Text | null = null
-  private returnLikelihoods: GameSave['entertainers'] | null = null
+  private entertainerData: GameSave['entertainers'] | null = null
   private performing = false
 
   // ---- Public getters for other systems ----
 
-  // MBW-116: Patience decay multiplier for current performer (1.0 = no boost)
-  getDecayMult(customerType: CustomerType): number {
+  // MBW-116/122: Patience decay multiplier for current performer, scaled by level
+  getDecayMult(customerType: string): number {
     if (!this.performing || !this.entertainer) return 1.0
-    return ENTERTAINER_CONFIGS[this.entertainer.id].patienceDecayMult[customerType]
+    const cfg = ENTERTAINER_CONFIGS[this.entertainer.id]
+    return computeDecayMult(cfg, this.entertainer.level, customerType)
   }
 
   // MBW-116: Coin boost multiplier for current performer (1.0 = no boost)
@@ -44,10 +47,15 @@ class EntertainerSystem {
     return ENTERTAINER_CONFIGS[this.entertainer.id].coinBoostMult
   }
 
+  // MBW-120: True while entertainer is in WAITING_TIP (day end is blocked)
+  get isWaitingForTip(): boolean {
+    return this.entertainer?.status === 'WAITING_TIP'
+  }
+
   // ---- Lifecycle ----
 
   init(app: Application, save: GameSave): void {
-    this.returnLikelihoods = save.entertainers
+    this.entertainerData = save.entertainers
     this.stage = new Container()
     app.stage.addChild(this.stage)
 
@@ -67,15 +75,43 @@ class EntertainerSystem {
     this.label = null
     this.entertainer = null
     this.performing = false
-    this.returnLikelihoods = null
+    this.entertainerData = null
+    useHudStore.setState({ tipPrompt: null })
   }
 
-  // Called by gameLoop.endDay() — returns tip result so save can be updated
-  getTipResult(): { entertainerId: Exclude<EntertainerId, 'jukebox'>; tipped: boolean } | null {
+  // MBW-120: Player chose a tip option — record choice and let entertainer leave
+  resolveTip(choice: TipChoice): void {
+    if (!this.entertainer || !this.entertainer.atBar) return
+    const e = this.entertainer
+    const cfg = ENTERTAINER_CONFIGS[e.id]
+    const fee = computeEntertainerFee(cfg, e.level)
+    const amounts: [number, number, number, number] = [
+      Math.round(fee * 2),
+      fee,
+      Math.max(1, Math.round(fee * 0.5)),
+      0,
+    ]
+    const amount = amounts[choice]
+    if (amount > 0) {
+      gameLoop.spendCoins(amount)
+    }
+    e.tipPaid = choice <= 1  // generous or adequate = "tipped"
+    e.tipAmount = amount
+    e.tipChoice = choice
+
+    useHudStore.setState({ tipPrompt: null })
+    eventDispatcher.emit('ENTERTAINER_TIPPED', { entertainerId: e.id, amount })
+    this.startLeaving()
+  }
+
+  // Called by gameLoop.endDay() — returns result so save can be updated
+  getTipResult(): { entertainerId: Exclude<EntertainerId, 'jukebox'>; tipChoice: TipChoice } | null {
     if (!this.entertainer || this.entertainer.id === 'jukebox') return null
+    // If tip was never resolved (e.g. day ended before they arrived), treat as refuse
+    const choice = this.entertainer.tipChoice ?? 3
     return {
       entertainerId: this.entertainer.id as Exclude<EntertainerId, 'jukebox'>,
-      tipped: this.entertainer.tipPaid,
+      tipChoice: choice,
     }
   }
 
@@ -84,6 +120,9 @@ class EntertainerSystem {
   tick(dt: number): void {
     if (!this.entertainer || !this.graphic) return
     const e = this.entertainer
+
+    // Don't move while waiting at bar for player to pick tip
+    if (e.status === 'WAITING_TIP' && e.atBar) return
 
     const dx = e.targetPosition.x - e.position.x
     const dy = e.targetPosition.y - e.position.y
@@ -113,23 +152,24 @@ class EntertainerSystem {
     this.spawnEntertainer(id)
   }
 
-  // MBW-116: At Last Orders, entertainer stops performing and waits for tip
+  // MBW-116/120: At Last Orders, entertainer stops performing and walks to bar for tip
   private handleLastOrders = (): void => {
     if (!this.entertainer) return
     if (this.entertainer.status === 'PERFORMING') {
       this.performing = false
       this.entertainer.status = 'WAITING_TIP'
-      // Jukebox doesn't wait for tip — just leaves
+      // Jukebox doesn't collect a tip — just leaves
       if (this.entertainer.id === 'jukebox') {
         this.startLeaving()
       } else {
-        this.makeClickable()
+        // Walk toward bar to collect tip
+        this.entertainer.targetPosition = { x: BAR_TIP_POSITION.x, y: BAR_TIP_POSITION.y }
       }
     }
   }
 
   private rollEntertainer(): EntertainerId {
-    const likelihoods = this.returnLikelihoods
+    const likelihoods = this.entertainerData
     const passed: Exclude<EntertainerId, 'jukebox'>[] = []
 
     for (const id of ENTERTAINER_IDS) {
@@ -146,14 +186,19 @@ class EntertainerSystem {
   private spawnEntertainer(id: EntertainerId): void {
     if (!this.stage) return
     const cfg = ENTERTAINER_CONFIGS[id]
+    // MBW-122: Read current level from save (default 1 for new saves / jukebox)
+    const level = id !== 'jukebox' ? (this.entertainerData?.[id]?.level ?? 1) : 1
 
     this.entertainer = {
       id,
       status: 'ARRIVING',
       position: { x: DOORWAY.x, y: DOORWAY.y },
       targetPosition: { x: STAGE_POSITION.x, y: STAGE_POSITION.y },
+      level,
       tipPaid: false,
       tipAmount: 0,
+      tipChoice: null,
+      atBar: false,
     }
 
     // PixiJS placeholder graphic
@@ -180,6 +225,10 @@ class EntertainerSystem {
       this.performing = true
       const cfg = ENTERTAINER_CONFIGS[this.entertainer.id]
       useHudStore.setState({ performingEntertainer: cfg.name })
+    } else if (this.entertainer.status === 'WAITING_TIP') {
+      // MBW-120: Reached bar — show tip prompt overlay
+      this.entertainer.atBar = true
+      this.showTipPrompt()
     } else if (this.entertainer.status === 'LEAVING') {
       eventDispatcher.emit('ENTERTAINER_LEFT', { entertainerId: this.entertainer.id })
       useHudStore.setState({ performingEntertainer: null })
@@ -191,20 +240,18 @@ class EntertainerSystem {
     }
   }
 
-  private makeClickable(): void {
-    if (!this.graphic || !this.entertainer) return
+  // MBW-120: Emit 4 tip options to HUD store for React overlay to render
+  private showTipPrompt(): void {
+    if (!this.entertainer) return
     const e = this.entertainer
     const cfg = ENTERTAINER_CONFIGS[e.id]
-    this.graphic.eventMode = 'static'
-    this.graphic.cursor = 'pointer'
-    this.graphic.on('pointerdown', () => {
-      if (e.tipPaid || cfg.tipCost === 0) return
-      const tipped = gameLoop.spendCoins(cfg.tipCost)
-      if (!tipped) return
-      e.tipPaid = true
-      e.tipAmount = cfg.tipCost
-      eventDispatcher.emit('ENTERTAINER_TIPPED', { entertainerId: e.id, amount: cfg.tipCost })
-      this.startLeaving()
+    const fee = computeEntertainerFee(cfg, e.level)
+    useHudStore.setState({
+      tipPrompt: {
+        entertainerId: e.id,
+        entertainerName: cfg.name,
+        options: [Math.round(fee * 2), fee, Math.max(1, Math.round(fee * 0.5)), 0],
+      },
     })
   }
 

@@ -362,6 +362,79 @@
   margin-top: 4px;
 }
 
+/* MBW-120: Tip prompt overlay — shown when entertainer reaches bar at Last Orders */
+.tip-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 2, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  border-radius: 8px;
+}
+
+.tip-card {
+  background: #2a1a08;
+  border: 1px solid #c8a040;
+  border-radius: 8px;
+  padding: 16px 20px;
+  width: 300px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tip-title {
+  font-size: 0.95rem;
+  color: #f5e6c8;
+  margin: 0;
+}
+
+.tip-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tip-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 6px;
+  border-radius: 6px;
+  border: 1px solid #5c3d11;
+  background: #3a2410;
+  color: #f5e6c8;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tip-btn:hover:not(:disabled) {
+  background: #4a3420;
+}
+
+.tip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tip-btn-0 { border-color: #c8a040; }
+.tip-btn-3 { border-color: #663333; }
+
+.tip-label {
+  font-size: 0.78rem;
+  color: #c4a87a;
+}
+
+.tip-amount {
+  font-size: 0.95rem;
+  font-weight: bold;
+}
+
 /* MBW-177: Two-tab shop layout */
 .shop-tabs {
   display: flex;

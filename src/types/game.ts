@@ -18,11 +18,11 @@ export interface GameSave {
   // Event state
   daysSinceLastGameDay: number
 
-  // MBW-121: Entertainer return likelihoods (0–1). Missing key → use DEFAULT_RETURN_LIKELIHOOD.
+  // MBW-121/122: Entertainer return likelihoods, hidden levels, and XP.
   entertainers: {
-    jinx: { returnLikelihood: number }
-    roland: { returnLikelihood: number }
-    melody: { returnLikelihood: number }
+    jinx: { returnLikelihood: number; level: number; xp: number }
+    roland: { returnLikelihood: number; level: number; xp: number }
+    melody: { returnLikelihood: number; level: number; xp: number }
   }
 
   // Lifetime stats
@@ -42,7 +42,7 @@ export interface GameSave {
   version: number
 }
 
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export const initialGameSave: GameSave = {
   dayNumber: 1,
@@ -53,9 +53,9 @@ export const initialGameSave: GameSave = {
   unlockedDrinks: ['lager', 'ale'],
   daysSinceLastGameDay: 0,
   entertainers: {
-    jinx: { returnLikelihood: 0.7 },
-    roland: { returnLikelihood: 0.7 },
-    melody: { returnLikelihood: 0.7 },
+    jinx: { returnLikelihood: 0.7, level: 1, xp: 0 },
+    roland: { returnLikelihood: 0.7, level: 1, xp: 0 },
+    melody: { returnLikelihood: 0.7, level: 1, xp: 0 },
   },
   stats: {
     totalCustomersServed: 0,
