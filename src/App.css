@@ -95,13 +95,6 @@
   min-width: 40px;
 }
 
-/* MBW-157: Game clock replaces phase label */
-.hud-clock {
-  font-size: 0.75rem;
-  color: #b89060;
-  min-width: 36px;
-  text-align: center;
-}
 
 .hud-stars {
   color: #ffd700;

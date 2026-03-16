@@ -23,6 +23,7 @@ import { kingsTraySystem } from '../engine/systems/kingsTraySystem'
 import { getUnlockedDrinks } from '../config/drinks'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { eventDispatcher } from '../engine/events/eventDispatcher'
+import { DAY_DURATION } from '../types/day'
 
 export function DayScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -218,21 +219,17 @@ function TipPromptOverlay() {
 function DayHud({ dayNumber }: { dayNumber: number }) {
   const { timeRemaining, coins, starRating, performingEntertainer } = useHudStore()
 
-  const minutes = Math.floor(timeRemaining / 60)
-  const seconds = Math.floor(timeRemaining % 60)
-  const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
-
-  // MBW-157: Game clock: 120s → 12:00, 0s → 00:00 (1 real second = 6 game minutes)
-  const gameTotalMins = Math.floor(timeRemaining) * 6
-  const gameHours = Math.floor(gameTotalMins / 60)
-  const gameMins = gameTotalMins % 60
+  // MBW-185: Single forward-counting game clock (12:00 → 00:00 over 120s)
+  const elapsed = DAY_DURATION - timeRemaining
+  const totalMins = 720 + Math.floor(elapsed) * 6
+  const gameHours = Math.floor(totalMins / 60) % 24
+  const gameMins = totalMins % 60
   const clockStr = `${gameHours.toString().padStart(2, '0')}:${gameMins.toString().padStart(2, '0')}`
 
   return (
     <div className="hud">
       <span className="hud-day">Day {dayNumber}</span>
-      <span className="hud-timer">{timeStr}</span>
-      <span className="hud-clock">{clockStr}</span>
+      <span className="hud-timer">{clockStr}</span>
       <StarRating rating={starRating} />
       <span className="hud-coins">🪙 {coins}</span>
       {performingEntertainer && (

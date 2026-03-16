@@ -6,7 +6,6 @@ import type { Application } from 'pixi.js'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { gameLoop } from '../gameLoop'
 import { eventDispatcher } from '../events/eventDispatcher'
-import { STAR_RATING } from '../../config/difficulty'
 import { BAR_COUNTER_TOP } from '../../config/barLayout'
 
 const KINGS_TRAY_PAYOUT = 200  // coins awarded on full completion
