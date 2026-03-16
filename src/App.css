@@ -40,7 +40,7 @@
   font-size: 2rem;
 }
 
-.screen button {
+.screen button:not(.upgrade-buy):not(.shop-tab) {
   padding: 12px 32px;
   font-size: 1rem;
   font-family: inherit;
@@ -51,7 +51,7 @@
   min-width: 200px;
 }
 
-.screen button:hover {
+.screen button:not(.upgrade-buy):not(.shop-tab):hover {
   background: #7a5220;
 }
 
@@ -277,20 +277,31 @@
 }
 
 .upgrade-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.upgrade-tier {
+  font-weight: normal;
   font-size: 0.85rem;
+  color: #7a6040;
 }
 
 .upgrade-card-body {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .upgrade-desc {
   font-size: 0.75rem;
   color: #b89060;
   flex: 3;
+  text-align: center;
 }
 
 .upgrade-owned {
@@ -300,10 +311,10 @@
 
 .upgrade-buy {
   flex: 1;
-  padding: 5px 6px;
+  padding: 8px 6px;
   font-size: 0.8rem;
   font-family: inherit;
-  background: #5c3d11;
+  background: transparent;
   color: #f5e6c8;
   border: 1px solid #8b6331;
   cursor: pointer;
@@ -312,7 +323,7 @@
 }
 
 .upgrade-buy:hover:not(:disabled) {
-  background: #7a5220;
+  background: rgba(122, 82, 32, 0.4);
 }
 
 .upgrade-buy:disabled {

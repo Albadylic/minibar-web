@@ -121,9 +121,9 @@ export function ShopScreen() {
     return (
       <div key={upgrade.id} className={`upgrade-card ${isMaxed ? 'upgrade-maxed' : ''}`}>
         <div className="upgrade-name">
-          {upgrade.name}
+          <span>{upgrade.name}</span>
           {upgrade.maxTier > 1 && (
-            <span className="upgrade-tier"> {isMaxed ? `★${currentTier}` : `${currentTier}/${upgrade.maxTier}`}</span>
+            <span className="upgrade-tier">{isMaxed ? `★ Maxed` : `Level ${currentTier}`}</span>
           )}
         </div>
         {isMaxed ? (
