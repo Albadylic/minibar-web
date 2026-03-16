@@ -6,10 +6,22 @@
 // MBW-178: Upgrade rotation gated by minDay; Day 2 always shows Fireplace + Candles
 import { useGameStore } from '../store/gameStore'
 import { useDayResultStore } from '../store/dayResultStore'
+import { useHudStore } from '../store/hudStore'
 import { selectReview } from '../engine/systems/reviewSystem'
 import { UPGRADES, type UpgradeConfig } from '../config/upgrades'
 import { rollNextDayEvent } from '../config/events'
 import { getPendingTutorials } from '../config/tutorials'
+import {
+  ENTERTAINER_CONFIGS,
+  XP_GENEROUS_BONUS,
+  XP_ADEQUATE_BONUS,
+  ADEQUATE_TIP_LIKELIHOOD_BONUS,
+  GENEROUS_TIP_LIKELIHOOD_BONUS,
+  NO_TIP_PENALTY,
+  MIN_LIKELIHOOD,
+  MAX_LIKELIHOOD,
+  computeNewLevel,
+} from '../config/entertainers'
 import { useMemo, useState } from 'react'
 
 // Deterministic shuffle seeded by day number — same upgrades always show for the same day
@@ -65,6 +77,37 @@ export function ShopScreen() {
   const completedDay = gameSave.dayNumber - 1
   const upcomingDay = gameSave.dayNumber
   const lastResult = useDayResultStore((s) => s.lastResult)
+  const tipPrompt = useHudStore((s) => s.tipPrompt)
+
+  // MBW-120: Resolve entertainer tip on the shop screen (deferred from end-of-day)
+  function handleTipChoice(choice: 0 | 1 | 2 | 3) {
+    if (!tipPrompt) return
+    const amount = tipPrompt.options[choice] ?? 0
+    const entertainerId = tipPrompt.entertainerId as 'jinx' | 'roland' | 'melody'
+    const cfg = ENTERTAINER_CONFIGS[entertainerId]
+    const current = gameSave.entertainers[entertainerId]
+    let xpBonus = 0
+    let likelihoodDelta = -NO_TIP_PENALTY
+    switch (choice) {
+      case 0: xpBonus = XP_GENEROUS_BONUS; likelihoodDelta = GENEROUS_TIP_LIKELIHOOD_BONUS; break
+      case 1: xpBonus = XP_ADEQUATE_BONUS; likelihoodDelta = ADEQUATE_TIP_LIKELIHOOD_BONUS; break
+      case 2: likelihoodDelta = 0; break
+      case 3: break
+    }
+    const newXp = current.xp + cfg.xpPerPerformance + xpBonus
+    updateSave({
+      coins: gameSave.coins - amount,
+      entertainers: {
+        ...gameSave.entertainers,
+        [entertainerId]: {
+          returnLikelihood: Math.max(MIN_LIKELIHOOD, Math.min(MAX_LIKELIHOOD, current.returnLikelihood + likelihoodDelta)),
+          level: computeNewLevel(newXp),
+          xp: newXp,
+        },
+      },
+    })
+    useHudStore.setState({ tipPrompt: null })
+  }
 
   // MBW-177: Tab state
   const [activeTab, setActiveTab] = useState<ShopTab>('upgrades')
@@ -147,8 +190,30 @@ export function ShopScreen() {
 
   return (
     <div className="screen shop-screen">
+      {/* MBW-120: Entertainer tip — resolved here after day ends, before shop is usable */}
+      {tipPrompt && (
+        <div className="tip-overlay">
+          <div className="tip-card">
+            <p className="tip-title">{tipPrompt.entertainerName} wants paying</p>
+            <div className="tip-options">
+              {(['Generous', 'Adequate', 'Poor', 'Refuse'] as const).map((label, i) => (
+                <button
+                  key={i}
+                  className={`tip-btn tip-btn-${i}`}
+                  disabled={(tipPrompt.options[i] ?? 0) > gameSave.coins}
+                  onClick={() => handleTipChoice(i as 0 | 1 | 2 | 3)}
+                >
+                  <span className="tip-label">{label}</span>
+                  <span className="tip-amount">{(tipPrompt.options[i] ?? 0) > 0 ? `🪙 ${tipPrompt.options[i]}` : 'Nothing'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MBW-173: Tutorial overlay — shown one at a time before the shop is usable */}
-      {activeTutorial && (
+      {!tipPrompt && activeTutorial && (
         <div className="tutorial-overlay">
           <div className="tutorial-card">
             <h3 className="tutorial-title">{activeTutorial.title}</h3>

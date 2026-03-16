@@ -259,13 +259,8 @@ class GameLoop {
       eventDispatcher.emit('LAST_ORDERS', {})
     }
 
-    // Day end — MBW-120: block if entertainer is waiting at bar for tip
+    // Day end
     if (this.timeElapsed >= DAY_DURATION) {
-      if (entertainerSystem.isWaitingForTip) {
-        // Keep entertainer walking/waiting; freeze all other simulation
-        entertainerSystem.tick(dt)
-        return
-      }
       this.dayEndedFired = true
       this.endDay()
       return
@@ -321,8 +316,13 @@ class GameLoop {
 
     const { gameSave, updateSave, goToScreen } = useGameStore.getState()
 
-    // MBW-121/122: Update entertainer likelihoods, XP, and level based on tip choice
-    const tipResult = entertainerSystem.getTipResult()
+    // MBW-121/122: Update entertainer likelihoods, XP, and level based on tip choice.
+    // If still waiting for tip, surface the prompt on the shop screen instead.
+    if (entertainerSystem.isWaitingForTip) {
+      const prompt = entertainerSystem.getPendingTipPrompt()
+      if (prompt) useHudStore.setState({ tipPrompt: prompt })
+    }
+    const tipResult = entertainerSystem.isWaitingForTip ? null : entertainerSystem.getTipResult()
     const updatedEntertainers = { ...gameSave.entertainers }
     if (tipResult) {
       const cfg = ENTERTAINER_CONFIGS[tipResult.entertainerId]

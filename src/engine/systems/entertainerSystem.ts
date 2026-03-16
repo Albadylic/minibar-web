@@ -47,9 +47,22 @@ class EntertainerSystem {
     return ENTERTAINER_CONFIGS[this.entertainer.id].coinBoostMult
   }
 
-  // MBW-120: True while entertainer is in WAITING_TIP (day end is blocked)
+  // MBW-120: True while a named entertainer has WAITING_TIP status and hasn't been resolved
   get isWaitingForTip(): boolean {
-    return this.entertainer?.status === 'WAITING_TIP'
+    return this.entertainer?.status === 'WAITING_TIP' && this.entertainer.tipChoice === null
+  }
+
+  // Returns the tip prompt data for the shop screen to display after the day ends
+  getPendingTipPrompt(): import('../../store/hudStore').TipPrompt | null {
+    if (!this.entertainer || this.entertainer.id === 'jukebox') return null
+    if (this.entertainer.tipChoice !== null) return null
+    const cfg = ENTERTAINER_CONFIGS[this.entertainer.id]
+    const fee = computeEntertainerFee(cfg, this.entertainer.level)
+    return {
+      entertainerId: this.entertainer.id,
+      entertainerName: cfg.name,
+      options: [Math.round(fee * 2), fee, Math.max(1, Math.round(fee * 0.5)), 0],
+    }
   }
 
   // ---- Lifecycle ----
@@ -226,9 +239,8 @@ class EntertainerSystem {
       const cfg = ENTERTAINER_CONFIGS[this.entertainer.id]
       useHudStore.setState({ performingEntertainer: cfg.name })
     } else if (this.entertainer.status === 'WAITING_TIP') {
-      // MBW-120: Reached bar — show tip prompt overlay
+      // MBW-120: Reached bar — day will surface the tip prompt on the shop screen
       this.entertainer.atBar = true
-      this.showTipPrompt()
     } else if (this.entertainer.status === 'LEAVING') {
       eventDispatcher.emit('ENTERTAINER_LEFT', { entertainerId: this.entertainer.id })
       useHudStore.setState({ performingEntertainer: null })

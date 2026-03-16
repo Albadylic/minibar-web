@@ -2,7 +2,8 @@
 export interface MessEntity {
   id: string
   position: { x: number; y: number }
-  seatId: string | null  // MBW-167: seat blocked by this mess (null = floor mess with no seat association)
+  seatId: string | null   // MBW-167: seat blocked by this mess (null = floor mess with no seat association)
+  tableId: string | null  // null for bar counter messes
 }
 
 let _nextMessId = 0

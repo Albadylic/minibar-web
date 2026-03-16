@@ -21,6 +21,7 @@ export interface CustomerEntity {
   seatId: string
   position: { x: number; y: number }
   targetPosition: { x: number; y: number }
+  waypoints: Array<{ x: number; y: number }>  // intermediate path points to avoid tables
   drinkOrder: string  // drinkId
   patienceTimer: number   // seconds remaining
   patienceMax: number     // for computing percentage

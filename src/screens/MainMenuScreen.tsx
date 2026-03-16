@@ -21,6 +21,9 @@ export function MainMenuScreen() {
       >
         New Game
       </button>
+      <button onClick={() => goToScreen('BETWEEN_DAY_SHOP')}>
+        Shop
+      </button>
     </div>
   )
 }
