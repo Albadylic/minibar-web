@@ -113,6 +113,10 @@ export function DayScreen() {
       customerRenderer.init(pixiApp.app)
       flyupRenderer.init(pixiApp.app) // MBW-67
       cleaningSystem.init(pixiApp.app, cleanerSpeed, cleanerNoIdlePause) // MBW-101/179
+      const bouncerTierGraphics = save.upgrades['bouncer']?.tier ?? 0
+      if (bouncerTierGraphics > 0) {
+        securitySystem.initGraphics(pixiApp.app)
+      }
       // MBW-178: Entertainers only available once Stage is purchased
       if (save.upgrades['stage']) {
         entertainerSystem.init(pixiApp.app, save) // MBW-116
@@ -130,6 +134,7 @@ export function DayScreen() {
       flyupRenderer.destroy()
       kingsTraySystem.destroy()
       cleaningSystem.destroy()
+      securitySystem.destroyGraphics()
       entertainerSystem.destroy()
       waiterSystem.destroy()
       customerRenderer.destroy()
@@ -187,30 +192,45 @@ function StarRating({ rating }: { rating: number }) {
   )
 }
 
-// MBW-120: Tip prompt overlay — shown when entertainer reaches bar at Last Orders
+// MBW-120: Tip prompt overlay — shown when entertainer reaches bar at 23:00
 function TipPromptOverlay() {
   const { tipPrompt, coins } = useHudStore()
+  const [chosenEmoji, setChosenEmoji] = useState<string | null>(null)
+
   if (!tipPrompt) return null
 
-  const labels = ['Generous', 'Adequate', 'Poor', 'Refuse']
+  const EMOJIS = ['😁', '😊', '😢', '😠']
+  const fee = tipPrompt.options[1]
+
+  function handleChoice(i: 0 | 1 | 2 | 3) {
+    setChosenEmoji(EMOJIS[i]!)
+    setTimeout(() => {
+      entertainerSystem.resolveTip(i)
+    }, 1000)
+  }
 
   return (
     <div className="tip-overlay">
       <div className="tip-card">
-        <p className="tip-title">{tipPrompt.entertainerName} wants paying</p>
-        <div className="tip-options">
-          {tipPrompt.options.map((amount, i) => (
-            <button
-              key={i}
-              className={`tip-btn tip-btn-${i}`}
-              disabled={amount > coins}
-              onClick={() => entertainerSystem.resolveTip(i as 0 | 1 | 2 | 3)}
-            >
-              <span className="tip-label">{labels[i]}</span>
-              <span className="tip-amount">{amount > 0 ? `🪙 ${amount}` : 'Nothing'}</span>
-            </button>
-          ))}
-        </div>
+        <p className="tip-title">
+          {tipPrompt.entertainerName} asks you for 🪙{fee} for {tipPrompt.pronoun} performance
+        </p>
+        {chosenEmoji ? (
+          <div className="tip-emoji">{chosenEmoji}</div>
+        ) : (
+          <div className="tip-options">
+            {tipPrompt.options.map((amount, i) => (
+              <button
+                key={i}
+                className={`tip-btn tip-btn-${i}`}
+                disabled={amount > coins}
+                onClick={() => handleChoice(i as 0 | 1 | 2 | 3)}
+              >
+                <span className="tip-amount">{amount > 0 ? `🪙 ${amount}` : 'Nothing'}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import type { CustomerType } from '../entities/customer'
 export interface EntertainerConfig {
   id: EntertainerId
   name: string
+  pronoun: string           // possessive pronoun for tip text (e.g. "his", "her", "their")
   description: string       // shown in ShopScreen when they appear
   placeholderColor: number  // circle color until sprite art is ready
   // Per-customer-type patience decay multiplier during performance at level 1 (<1 = patients wait longer)
@@ -23,6 +24,7 @@ export const ENTERTAINER_CONFIGS: Record<EntertainerId, EntertainerConfig> = {
   jinx: {
     id: 'jinx',
     name: 'Jinx',
+    pronoun: 'their',
     description: 'Jester. Hooligans laugh instead of brawling.',
     placeholderColor: 0xffcc00,
     patienceDecayMult: { NORMAL: 0.85, HOOLIGAN: 0.60, RICH: 0.95, DRUNK: 1.0 },
@@ -35,6 +37,7 @@ export const ENTERTAINER_CONFIGS: Record<EntertainerId, EntertainerConfig> = {
   roland: {
     id: 'roland',
     name: 'Roland',
+    pronoun: 'his',
     description: 'Bard. Rich clientele are more patient and generous.',
     placeholderColor: 0x8844cc,
     patienceDecayMult: { NORMAL: 0.90, HOOLIGAN: 0.95, RICH: 0.70, DRUNK: 1.0 },
@@ -47,6 +50,7 @@ export const ENTERTAINER_CONFIGS: Record<EntertainerId, EntertainerConfig> = {
   melody: {
     id: 'melody',
     name: 'Melody',
+    pronoun: 'her',
     description: 'Musician. A steady boost for everyone.',
     placeholderColor: 0x44aacc,
     patienceDecayMult: { NORMAL: 0.80, HOOLIGAN: 0.82, RICH: 0.85, DRUNK: 1.0 },
@@ -60,6 +64,7 @@ export const ENTERTAINER_CONFIGS: Record<EntertainerId, EntertainerConfig> = {
   jukebox: {
     id: 'jukebox',
     name: 'Jukebox',
+    pronoun: '',
     description: 'Automated music. A small, reliable boost — no tip needed.',
     placeholderColor: 0x555566,
     patienceDecayMult: { NORMAL: 0.92, HOOLIGAN: 0.95, RICH: 0.90, DRUNK: 1.0 },

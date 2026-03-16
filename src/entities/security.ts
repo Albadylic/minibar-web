@@ -2,10 +2,12 @@
 // MBW-180: Tier 3 added — fastest response, handles all brawls simultaneously
 export interface SecurityResponse {
   brawlId: string
-  timer: number // seconds until auto-resolve
+  instigatorId: string // needed to look up brawler position each tick
 }
 
 export interface SecurityState {
   tier: 1 | 2 | 3
-  responses: SecurityResponse[] // Tier 1 max 1; Tier 2/3 handle multiple/all
+  responses: SecurityResponse[] // queue; [0] = active, rest = pending
+  bouncerPos: { x: number; y: number }
+  returning: boolean // true when walking back to BOUNCER_START
 }

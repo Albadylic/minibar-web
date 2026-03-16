@@ -31,6 +31,7 @@ class EntertainerSystem {
   private label: Text | null = null
   private entertainerData: GameSave['entertainers'] | null = null
   private performing = false
+  private barWalkFired = false
 
   // ---- Public getters for other systems ----
 
@@ -61,6 +62,7 @@ class EntertainerSystem {
     return {
       entertainerId: this.entertainer.id,
       entertainerName: cfg.name,
+      pronoun: cfg.pronoun,
       options: [Math.round(fee * 2), fee, Math.max(1, Math.round(fee * 0.5)), 0],
     }
   }
@@ -69,16 +71,15 @@ class EntertainerSystem {
 
   init(app: Application, save: GameSave): void {
     this.entertainerData = save.entertainers
+    this.barWalkFired = false
     this.stage = new Container()
     app.stage.addChild(this.stage)
 
     eventDispatcher.on('PHASE_CHANGED', this.handlePhaseChanged)
-    eventDispatcher.on('LAST_ORDERS', this.handleLastOrders)
   }
 
   destroy(): void {
     eventDispatcher.off('PHASE_CHANGED', this.handlePhaseChanged)
-    eventDispatcher.off('LAST_ORDERS', this.handleLastOrders)
 
     this.graphic?.destroy()
     this.label?.destroy()
@@ -88,8 +89,8 @@ class EntertainerSystem {
     this.label = null
     this.entertainer = null
     this.performing = false
+    this.barWalkFired = false
     this.entertainerData = null
-    useHudStore.setState({ tipPrompt: null })
   }
 
   // MBW-120: Player chose a tip option — record choice and let entertainer leave
@@ -134,6 +135,18 @@ class EntertainerSystem {
     if (!this.entertainer || !this.graphic) return
     const e = this.entertainer
 
+    // At 10s remaining (23:00), named performer walks to bar for tip; jukebox just leaves
+    if (e.status === 'PERFORMING' && !this.barWalkFired && useHudStore.getState().timeRemaining <= 10) {
+      this.barWalkFired = true
+      if (e.id === 'jukebox') {
+        this.startLeaving()
+      } else {
+        this.performing = false
+        e.status = 'WAITING_TIP'
+        e.targetPosition = { x: BAR_TIP_POSITION.x, y: BAR_TIP_POSITION.y }
+      }
+    }
+
     // Don't move while waiting at bar for player to pick tip
     if (e.status === 'WAITING_TIP' && e.atBar) return
 
@@ -163,22 +176,6 @@ class EntertainerSystem {
     if (phase !== 'EVENING') return
     const id = this.rollEntertainer()
     this.spawnEntertainer(id)
-  }
-
-  // MBW-116/120: At Last Orders, entertainer stops performing and walks to bar for tip
-  private handleLastOrders = (): void => {
-    if (!this.entertainer) return
-    if (this.entertainer.status === 'PERFORMING') {
-      this.performing = false
-      this.entertainer.status = 'WAITING_TIP'
-      // Jukebox doesn't collect a tip — just leaves
-      if (this.entertainer.id === 'jukebox') {
-        this.startLeaving()
-      } else {
-        // Walk toward bar to collect tip
-        this.entertainer.targetPosition = { x: BAR_TIP_POSITION.x, y: BAR_TIP_POSITION.y }
-      }
-    }
   }
 
   private rollEntertainer(): EntertainerId {
@@ -239,8 +236,9 @@ class EntertainerSystem {
       const cfg = ENTERTAINER_CONFIGS[this.entertainer.id]
       useHudStore.setState({ performingEntertainer: cfg.name })
     } else if (this.entertainer.status === 'WAITING_TIP') {
-      // MBW-120: Reached bar — day will surface the tip prompt on the shop screen
+      // MBW-120: Reached bar — show tip prompt immediately
       this.entertainer.atBar = true
+      this.showTipPrompt()
     } else if (this.entertainer.status === 'LEAVING') {
       eventDispatcher.emit('ENTERTAINER_LEFT', { entertainerId: this.entertainer.id })
       useHudStore.setState({ performingEntertainer: null })
@@ -262,6 +260,7 @@ class EntertainerSystem {
       tipPrompt: {
         entertainerId: e.id,
         entertainerName: cfg.name,
+        pronoun: cfg.pronoun,
         options: [Math.round(fee * 2), fee, Math.max(1, Math.round(fee * 0.5)), 0],
       },
     })

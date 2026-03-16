@@ -101,7 +101,7 @@ class CleaningSystem {
     if (seat.type === 'bar_stool') {
       // Place glass on the bar counter surface, centred on the stool x
       glassX = seat.position.x
-      glassY = BAR_COUNTER_TOP + 20
+      glassY = BAR_COUNTER_BOTTOM - 10
       onCounter = true
     } else {
       // Place glass at the table centre, offset left/right to avoid stacking
@@ -251,12 +251,15 @@ class CleaningSystem {
     type Candidate = { messId: string; tableId: string | null; spot: { x: number; y: number }; dist2: number }
     const candidates: Candidate[] = []
 
-    // Counter messes: walk directly to the glass
+    // Counter messes: walk to the floor edge below the glass (not into the bar counter)
     for (const m of this.messes) {
       if (m.tableId !== null) continue
-      const dx = m.position.x - pos.x
-      const dy = m.position.y - pos.y
-      candidates.push({ messId: m.id, tableId: null, spot: m.position, dist2: dx * dx + dy * dy })
+      const spot = m.position.y < FLOOR_TOP
+        ? { x: m.position.x, y: FLOOR_TOP }
+        : m.position
+      const dx = spot.x - pos.x
+      const dy = spot.y - pos.y
+      candidates.push({ messId: m.id, tableId: null, spot, dist2: dx * dx + dy * dy })
     }
 
     // Table messes: one candidate per table, walk to nearest side-spot
@@ -345,6 +348,9 @@ class CleaningSystem {
       const cost = Math.hypot(c.x - from.x, c.y - from.y) + Math.hypot(to.x - c.x, to.y - c.y)
       if (cost < bestCost) { bestCost = cost; bestCorner = c }
     }
+
+    // If the best corner is at or indistinguishably close to the destination, no useful detour exists
+    if (Math.hypot(bestCorner.x - to.x, bestCorner.y - to.y) < 1) return [to]
 
     const pathToCorner = this.computePath(from, bestCorner, skipTableId, depth + 1)
     const pathFromCorner = this.computePath(bestCorner, to, skipTableId, depth + 1)

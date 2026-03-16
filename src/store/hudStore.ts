@@ -7,6 +7,7 @@ import type { DayPhase } from '../types/day'
 export interface TipPrompt {
   entertainerId: string
   entertainerName: string
+  pronoun: string
   options: [number, number, number, number]  // Generous, Adequate, Poor, Refuse amounts
 }
 

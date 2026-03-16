@@ -82,6 +82,8 @@ export function ShopScreen() {
   // MBW-120: Resolve entertainer tip on the shop screen (deferred from end-of-day)
   function handleTipChoice(choice: 0 | 1 | 2 | 3) {
     if (!tipPrompt) return
+    const EMOJIS = ['😁', '😊', '😢', '😠']
+    setTipEmoji(EMOJIS[choice]!)
     const amount = tipPrompt.options[choice] ?? 0
     const entertainerId = tipPrompt.entertainerId as 'jinx' | 'roland' | 'melody'
     const cfg = ENTERTAINER_CONFIGS[entertainerId]
@@ -106,8 +108,13 @@ export function ShopScreen() {
         },
       },
     })
-    useHudStore.setState({ tipPrompt: null })
+    setTimeout(() => {
+      useHudStore.setState({ tipPrompt: null })
+    }, 1000)
   }
+
+  // MBW-120: Emoji shown after tip choice before dismissing
+  const [tipEmoji, setTipEmoji] = useState<string | null>(null)
 
   // MBW-177: Tab state
   const [activeTab, setActiveTab] = useState<ShopTab>('upgrades')
@@ -194,20 +201,25 @@ export function ShopScreen() {
       {tipPrompt && (
         <div className="tip-overlay">
           <div className="tip-card">
-            <p className="tip-title">{tipPrompt.entertainerName} wants paying</p>
-            <div className="tip-options">
-              {(['Generous', 'Adequate', 'Poor', 'Refuse'] as const).map((label, i) => (
-                <button
-                  key={i}
-                  className={`tip-btn tip-btn-${i}`}
-                  disabled={(tipPrompt.options[i] ?? 0) > gameSave.coins}
-                  onClick={() => handleTipChoice(i as 0 | 1 | 2 | 3)}
-                >
-                  <span className="tip-label">{label}</span>
-                  <span className="tip-amount">{(tipPrompt.options[i] ?? 0) > 0 ? `🪙 ${tipPrompt.options[i]}` : 'Nothing'}</span>
-                </button>
-              ))}
-            </div>
+            <p className="tip-title">
+              {tipPrompt.entertainerName} asks you for 🪙{tipPrompt.options[1]} for {tipPrompt.pronoun} performance
+            </p>
+            {tipEmoji ? (
+              <div className="tip-emoji">{tipEmoji}</div>
+            ) : (
+              <div className="tip-options">
+                {tipPrompt.options.map((amount, i) => (
+                  <button
+                    key={i}
+                    className={`tip-btn tip-btn-${i}`}
+                    disabled={amount > gameSave.coins}
+                    onClick={() => handleTipChoice(i as 0 | 1 | 2 | 3)}
+                  >
+                    <span className="tip-amount">{amount > 0 ? `🪙 ${amount}` : 'Nothing'}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
