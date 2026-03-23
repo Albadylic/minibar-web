@@ -284,7 +284,8 @@ class CleaningSystem {
   private getCleaningSpot(tableId: string, from: { x: number; y: number }): { x: number; y: number } {
     const table = TABLES.find((t) => t.id === tableId)
     if (!table) return from
-    const { x: tx, y: ty, width: tw, height: th } = table
+    const { x: tx, y: ty } = table.position
+    const { width: tw, height: th } = table
     const margin = CLEANER_RADIUS + 4
     const spots = [
       { x: tx,                   y: ty - th / 2 - margin },  // North
@@ -336,11 +337,13 @@ class CleaningSystem {
     const bt = blockingTable
     const halfW = bt.width / 2 + MARGIN
     const halfH = bt.height / 2 + MARGIN
+    const clampX = (x: number) => Math.max(10, Math.min(CANVAS_WIDTH - 10, x))
+    const clampY = (y: number) => Math.max(FLOOR_TOP + 5, Math.min(FLOOR_BOTTOM - 5, y))
     const corners = [
-      { x: bt.position.x - halfW, y: bt.position.y - halfH },
-      { x: bt.position.x + halfW, y: bt.position.y - halfH },
-      { x: bt.position.x - halfW, y: bt.position.y + halfH },
-      { x: bt.position.x + halfW, y: bt.position.y + halfH },
+      { x: clampX(bt.position.x - halfW), y: clampY(bt.position.y - halfH) },
+      { x: clampX(bt.position.x + halfW), y: clampY(bt.position.y - halfH) },
+      { x: clampX(bt.position.x - halfW), y: clampY(bt.position.y + halfH) },
+      { x: clampX(bt.position.x + halfW), y: clampY(bt.position.y + halfH) },
     ]
     let bestCorner = corners[0]!
     let bestCost = Infinity
