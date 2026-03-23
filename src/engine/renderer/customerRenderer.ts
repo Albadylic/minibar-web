@@ -9,6 +9,7 @@ import { DRINKS_BY_ID } from '../../config/drinks'
 import { barScene } from './barScene'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { brawlSystem } from '../systems/brawlSystem'
+import { REGULARS_BY_ID } from '../../config/regulars'
 
 const BODY_RADIUS = 14
 const PATIENCE_BAR_WIDTH = 32
@@ -111,10 +112,13 @@ class CustomerRenderer {
     root.addChild(ejectBar)
 
     // MBW-164: Type-specific markers make special customers instantly recognisable
+    // MBW-NEW: Regulars use their class letter (B=Blacksmith, F=Farmer, P=Priest, M=Merchant)
     const markerText =
-      customer.type === 'HOOLIGAN' ? 'H' :
-      customer.type === 'RICH' ? 'D' :
-      customer.skin[0]!.toUpperCase()
+      customer.isRegular && customer.regularId
+        ? (REGULARS_BY_ID[customer.regularId]?.letterMarker ?? customer.skin[0]!.toUpperCase())
+        : customer.type === 'HOOLIGAN' ? 'H'
+        : customer.type === 'RICH' ? 'D'
+        : customer.skin[0]!.toUpperCase()
     const label = new Text({ text: markerText, style: labelStyle })
     label.anchor.set(0.5)
     label.position.set(0, 1)
@@ -130,9 +134,10 @@ class CustomerRenderer {
     // Position
     root.position.set(customer.position.x, customer.position.y)
 
-    // Body color — use type-specific config (hooligan red vs normal skin colors)
+    // Body color — regulars are green; otherwise use type-specific config
+    // MBW-NEW: Green sprites make regulars instantly identifiable
     const config = CUSTOMER_CONFIGS[customer.type]
-    const bodyColor = config.placeholderColors[customer.skin]
+    const bodyColor = customer.isRegular ? 0x22aa44 : config.placeholderColors[customer.skin]
     body.clear()
     body.circle(0, 0, BODY_RADIUS)
     body.fill({ color: bodyColor })

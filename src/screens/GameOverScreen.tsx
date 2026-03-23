@@ -7,7 +7,9 @@ export function GameOverScreen() {
     <div className="screen game-over-screen">
       <h2>Game Over</h2>
       <p>Days survived: {gameSave.dayNumber}</p>
-      <p>Star rating: {gameSave.starRating.toFixed(1)}</p>
+      {gameSave.displayedRating > 0 && (
+        <p>Rating: ★ {gameSave.displayedRating.toFixed(1)}</p>
+      )}
       <button
         onClick={() => {
           resetSave()

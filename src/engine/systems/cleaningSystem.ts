@@ -284,7 +284,8 @@ class CleaningSystem {
   private getCleaningSpot(tableId: string, from: { x: number; y: number }): { x: number; y: number } {
     const table = TABLES.find((t) => t.id === tableId)
     if (!table) return from
-    const { x: tx, y: ty, width: tw, height: th } = table
+    const { x: tx, y: ty } = table.position
+    const { width: tw, height: th } = table
     const margin = CLEANER_RADIUS + 4
     const spots = [
       { x: tx,                   y: ty - th / 2 - margin },  // North

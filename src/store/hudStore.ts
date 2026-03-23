@@ -15,7 +15,8 @@ interface HudState {
   timeRemaining: number
   phase: DayPhase
   coins: number
-  starRating: number
+  // MBW-NEW: displayedRating replaces real-time starRating — stable throughout the day
+  displayedRating: number
   selectedDrinkId: string | null
   performingEntertainer: string | null  // MBW-116: null = no performer
   tipPrompt: TipPrompt | null           // MBW-120: non-null = show tip prompt overlay
@@ -25,7 +26,7 @@ export const useHudStore = create<HudState>()(() => ({
   timeRemaining: 120,
   phase: 'MORNING',
   coins: 0,
-  starRating: 3.0,
+  displayedRating: 0,
   selectedDrinkId: null,
   performingEntertainer: null,
   tipPrompt: null,

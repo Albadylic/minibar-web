@@ -28,7 +28,6 @@ export const BRAWL = {
   autoResolveFallback: 20,  // seconds before brawl resolves on its own (longer — gives player time to chase)
   tapsRequiredBase: 5,      // taps to eject on day 1
   tapsRequiredMax: 9,       // capped at this value
-  starLossPerCasualty: 0.12, // star rating hit per disrupted customer
   walkSpeed: 70,            // MBW-150: brawler roam speed in px/s
   roamCooldown: 1.5,        // MBW-150: pause (seconds) after disrupting a seat before picking next target
 } as const
@@ -41,17 +40,6 @@ export function getBrawlTapsRequired(dayNumber: number): number {
   )
 }
 
-// Star rating balance
-export const STAR_RATING = {
-  initial: 3.0,
-  max: 5.0,
-  gameOverThreshold: 1.0,
-  gainPerCorrectServe: 0.05,
-  skillBonusGain: 0.02,      // extra gain when serve is fast (patience > 50% remaining)
-  lossPerBadReview: 0.15,    // unserved customer leaves
-  lossPerWrongDrink: 0.1,
-  lossPerHarshReview: 0.28,  // MBW-94: rich customer leaves unhappy — significantly worse
-} as const
 
 // MBW-99: Mess spawning — glasses appear only when a customer leaves (not on serve)
 export const MESS = {

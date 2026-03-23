@@ -16,7 +16,8 @@ import {
   TICK_RATE,
 } from '../types/day'
 import type { GameSave } from '../types/game'
-import { BASE_ARRIVAL_RATES, STAR_RATING, getArrivalRateMultiplier, getPatienceMultiplierForDay } from '../config/difficulty'
+import { BASE_ARRIVAL_RATES, getArrivalRateMultiplier, getPatienceMultiplierForDay } from '../config/difficulty'
+import { getArrivalRatingMultiplier } from '../config/reviewConfig'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { useDayResultStore } from '../store/dayResultStore'
 import { GAME_DAY_CONFIG, EVENT_CONFIGS } from '../config/events'
@@ -45,6 +46,8 @@ import type { EventType } from '../types/day'
 export function generateDayConfig(save: GameSave, event: EventType | null = null): DayConfig {
   // MBW-51: Scale arrival rates and patience with day number
   const arrivalMult = getArrivalRateMultiplier(save.dayNumber)
+  // MBW-NEW: Rating multiplier — higher rating drives more traffic
+  const ratingArrivalMult = getArrivalRatingMultiplier(save.displayedRating)
   const dayPatienceMult = getPatienceMultiplierForDay(save.dayNumber)
 
   let patienceMultiplier = dayPatienceMult
@@ -129,10 +132,10 @@ export function generateDayConfig(save: GameSave, event: EventType | null = null
     event,
     duration: DAY_DURATION,
     arrivalRates: {
-      morning: BASE_ARRIVAL_RATES.morning * arrivalMult * eventArrivalMult,
-      afternoon: BASE_ARRIVAL_RATES.afternoon * arrivalMult * eventArrivalMult,
-      evening: BASE_ARRIVAL_RATES.evening * arrivalMult * eventArrivalMult,
-      night: BASE_ARRIVAL_RATES.night * arrivalMult * eventArrivalMult,
+      morning: BASE_ARRIVAL_RATES.morning * arrivalMult * ratingArrivalMult * eventArrivalMult,
+      afternoon: BASE_ARRIVAL_RATES.afternoon * arrivalMult * ratingArrivalMult * eventArrivalMult,
+      evening: BASE_ARRIVAL_RATES.evening * arrivalMult * ratingArrivalMult * eventArrivalMult,
+      night: BASE_ARRIVAL_RATES.night * arrivalMult * ratingArrivalMult * eventArrivalMult,
     },
     modifiers: {
       patienceMultiplier,
@@ -168,8 +171,6 @@ class GameLoop {
   // Runtime values — initialised from GameSave, mutated during the day
   private coins = 0
   private startCoins = 0
-  private starRating = 3.0
-  private startStarRating = 3.0
   private selectedDrinkId: string | null = null
   private customersServed = 0
   private wrongDrinks = 0
@@ -179,7 +180,6 @@ class GameLoop {
   start(
     dayConfig: DayConfig,
     initialCoins: number,
-    initialStarRating: number,
     unlockedDrinks: string[],
   ): void {
     if (this.rafId !== null) this.stop()
@@ -191,8 +191,6 @@ class GameLoop {
     this.dayEndedFired = false
     this.coins = initialCoins
     this.startCoins = initialCoins
-    this.starRating = initialStarRating
-    this.startStarRating = initialStarRating
     this.selectedDrinkId = null
     this.customersServed = 0
     this.wrongDrinks = 0
@@ -203,11 +201,12 @@ class GameLoop {
     brawlSystem.reset()
     resetBrawlIdCounter()
 
+    const { gameSave } = useGameStore.getState()
     useHudStore.setState({
       timeRemaining: DAY_DURATION,
       phase: 'MORNING',
       coins: initialCoins,
-      starRating: initialStarRating,
+      displayedRating: gameSave.displayedRating,
       selectedDrinkId: null,
     })
 
@@ -292,7 +291,6 @@ class GameLoop {
       timeRemaining,
       phase: this.currentPhase,
       coins: this.coins,
-      starRating: this.starRating,
       selectedDrinkId: this.selectedDrinkId,
     })
   }
@@ -307,8 +305,9 @@ class GameLoop {
   // MBW-10: Commit results, save, transition to shop
   private endDay(): void {
     const coinsEarned = this.coins - this.startCoins
-    const starRatingDelta = this.starRating - this.startStarRating
+    const eventType = this.dayConfig?.event ?? null
 
+    // MBW-NEW: DAY_ENDED fires first so ReviewSystem can flush today's reviews to the store
     eventDispatcher.emit('DAY_ENDED', {
       coinsEarned,
       customersServed: this.customersServed,
@@ -327,7 +326,6 @@ class GameLoop {
     if (tipResult) {
       const cfg = ENTERTAINER_CONFIGS[tipResult.entertainerId]
       const current = gameSave.entertainers[tipResult.entertainerId]
-      // Determine XP gain and likelihood delta from tip choice
       let xpBonus = 0
       let likelihoodDelta = -NO_TIP_PENALTY
       switch (tipResult.tipChoice) {
@@ -355,7 +353,6 @@ class GameLoop {
 
     updateSave({
       coins: this.coins,
-      starRating: this.starRating,
       dayNumber: gameSave.dayNumber + 1,
       entertainers: updatedEntertainers,
       stats: {
@@ -367,16 +364,12 @@ class GameLoop {
       },
     })
 
-    // MBW-59/60: Snapshot day result so ShopScreen can select and display a review
-    useDayResultStore.getState().setResult({
-      dayNumber: gameSave.dayNumber,
-      customersServed: this.customersServed,
-      wrongDrinks: this.wrongDrinks,
-      coinsEarned: Math.max(0, coinsEarned),
-      starRatingDelta,
-      finalRating: this.starRating,
-      eventType: this.dayConfig?.event ?? null,  // MBW-112: pass event for review tag matching
-    })
+    // MBW-NEW: Update eventType on the day result that ReviewSystem already wrote
+    // (ReviewSystem emits during DAY_ENDED, before we set eventType here)
+    const existing = useDayResultStore.getState().lastResult
+    if (existing) {
+      useDayResultStore.getState().setResult({ ...existing, eventType })
+    }
 
     this.stop()
     goToScreen('BETWEEN_DAY_SHOP')
@@ -393,12 +386,6 @@ class GameLoop {
     if (this.coins < amount) return false
     this.coins -= amount
     return true
-  }
-
-  // Returns true if rating dropped below game over threshold
-  adjustStarRating(delta: number): boolean {
-    this.starRating = Math.max(0, Math.min(STAR_RATING.max, this.starRating + delta))
-    return this.starRating < STAR_RATING.gameOverThreshold
   }
 
   selectDrink(drinkId: string | null): void {
@@ -422,7 +409,6 @@ class GameLoop {
     const { gameSave, updateSave, goToScreen } = useGameStore.getState()
     updateSave({
       coins: this.coins,
-      starRating: this.starRating,
       stats: {
         ...gameSave.stats,
         totalDaysPlayed: gameSave.stats.totalDaysPlayed + 1,
@@ -453,7 +439,6 @@ class GameLoop {
       phase: this.currentPhase,
       isLastOrders: this.lastOrdersFired,
       coins: this.coins,
-      starRating: this.starRating,
       selectedDrinkId: this.selectedDrinkId,
       dayConfig: this.dayConfig,
     }

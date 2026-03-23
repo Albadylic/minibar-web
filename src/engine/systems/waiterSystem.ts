@@ -10,7 +10,6 @@ import { entertainerSystem } from './entertainerSystem'
 import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { DRINKS_BY_ID } from '../../config/drinks'
-import { STAR_RATING } from '../../config/difficulty'
 import { BAR_COUNTER_BOTTOM } from '../../config/barLayout'
 
 const WAITER_RADIUS = 8
@@ -179,7 +178,6 @@ class WaiterSystem {
     )
 
     gameLoop.addCoins(coins)
-    gameLoop.adjustStarRating(STAR_RATING.gainPerCorrectServe)
     gameLoop.recordCustomerServed()
     customerSystem.serveCustomer(customerId)
 

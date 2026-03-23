@@ -1,13 +1,13 @@
 // MBW-38: Between-day shop screen
 // MBW-40: Purchase logic wired to purchaseUpgrade store action
-// MBW-61: End-of-day Yelp-style review card
+// MBW-61: End-of-day review card (now shows featured review from ReviewSystem)
 // MBW-149: One tier per day limit — purchasedToday blocks re-buys until next day
 // MBW-177: Two-tab shop — Upgrades (rotating 3/day) + Staff (always visible)
 // MBW-178: Upgrade rotation gated by minDay; Day 2 always shows Fireplace + Candles
+// MBW-NEW: Routes to WEEKLY_REPORT at end of every 7th day
 import { useGameStore } from '../store/gameStore'
 import { useDayResultStore } from '../store/dayResultStore'
 import { useHudStore } from '../store/hudStore'
-import { selectReview } from '../engine/systems/reviewSystem'
 import { UPGRADES, type UpgradeConfig } from '../config/upgrades'
 import { rollNextDayEvent } from '../config/events'
 import { getPendingTutorials } from '../config/tutorials'
@@ -37,9 +37,6 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 }
 
 // MBW-178: Pick rotating upgrades for the Upgrades tab.
-// Staff-category upgrades are excluded — they live in the Staff tab.
-// minDay gates which upgrades are available for the upcoming day.
-// Day 2 special rule: always include Fireplace + Candles if not yet maxed.
 function pickShopUpgrades(
   upgrades: UpgradeConfig[],
   ownedUpgrades: Record<string, { tier: number; purchasedOnDay: number }>,
@@ -55,7 +52,6 @@ function pickShopUpgrades(
 
   if (rotationPool.length <= count) return rotationPool
 
-  // MBW-178: Day 2 forces Fireplace and Candles into the first two slots
   if (upcomingDay === 2) {
     const forced = rotationPool.filter((u) => u.id === 'fireplace' || u.id === 'candles')
     const rest = rotationPool.filter((u) => u.id !== 'fireplace' && u.id !== 'candles')
@@ -113,33 +109,18 @@ export function ShopScreen() {
     }, 1000)
   }
 
-  // MBW-120: Emoji shown after tip choice before dismissing
   const [tipEmoji, setTipEmoji] = useState<string | null>(null)
-
-  // MBW-177: Tab state
   const [activeTab, setActiveTab] = useState<ShopTab>('upgrades')
-
-  // MBW-149: Track upgrades purchased this shop visit (one tier per upgrade per day)
   const [purchasedToday, setPurchasedToday] = useState<Set<string>>(new Set())
 
-  // Select a review once when the screen mounts (stable across re-renders)
-  const review = useMemo(
-    () => (lastResult ? selectReview(lastResult) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
-
-  // MBW-177/178: Rotating upgrades for Upgrades tab — 3/day, day-gated, Day 2 forced rule
   const shopUpgrades = useMemo(
     () => pickShopUpgrades(UPGRADES, gameSave.upgrades, upcomingDay, 3),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  // MBW-177: Staff upgrades — always visible, never rotate
   const staffUpgrades = useMemo(() => pickStaffUpgrades(UPGRADES), [])
 
-  // MBW-173: Tutorials pending for this upcoming day (computed once on mount)
   const pendingTutorials = useMemo(
     () => getPendingTutorials(upcomingDay, gameSave.shownTutorials, gameSave.upgrades),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,7 +145,6 @@ export function ShopScreen() {
     const currentTier = owned?.tier ?? 0
     const isMaxed = currentTier >= upgrade.maxTier
     const tierConfig = upgrade.tiers[currentTier]
-    // MBW-149: Disable if already bought one tier today
     const boughtToday = purchasedToday.has(upgrade.id)
     const canAfford = tierConfig ? gameSave.coins >= tierConfig.cost : false
 
@@ -194,6 +174,32 @@ export function ShopScreen() {
       </div>
     )
   }
+
+  // MBW-NEW: Route to WeeklyReport at end of every 7th completed day
+  const isEndOfWeek = completedDay > 0 && completedDay % 7 === 0
+
+  function handleStartNext() {
+    const event = rollNextDayEvent(gameSave)
+    setPendingEvent(event)
+    if (event) {
+      updateSave({ daysSinceLastGameDay: 0 })
+    } else {
+      updateSave({ daysSinceLastGameDay: gameSave.daysSinceLastGameDay + 1 })
+    }
+
+    if (isEndOfWeek) {
+      goToScreen('WEEKLY_REPORT')
+    } else if (event) {
+      goToScreen('EVENT_NOTICE')
+    } else {
+      goToScreen('DAY_IN_PROGRESS')
+    }
+  }
+
+  // MBW-NEW: Featured review from the new review system
+  const featuredReview = lastResult?.featuredReview ?? null
+  const reviewCount = lastResult?.reviewCount ?? 0
+  const showReviews = gameSave.dayNumber > 8  // Week 2+ only (dayNumber already incremented)
 
   return (
     <div className="screen shop-screen">
@@ -237,17 +243,31 @@ export function ShopScreen() {
 
       <h2>Day {completedDay} Complete</h2>
       <div className="day-summary">
-        <span>⭐ {gameSave.starRating.toFixed(1)}</span>
+        {gameSave.displayedRating > 0 ? (
+          <span>★ {gameSave.displayedRating.toFixed(1)}</span>
+        ) : (
+          <span className="rating-new-badge">NEW</span>
+        )}
         <span>🪙 {gameSave.coins} coins</span>
       </div>
 
-      {review && (
-        <div className="review-card">
+      {/* MBW-NEW: Featured review from the review system (Week 2+) */}
+      {showReviews && featuredReview && (
+        <div className={`review-card ${featuredReview.isRegular ? 'review-card-regular' : ''}`}>
           <div className="review-header">
-            <span className="review-name">{review.name}</span>
-            <span className="review-stars">{'★'.repeat(review.reviewStars)}{'☆'.repeat(5 - review.reviewStars)}</span>
+            <span className="review-name">
+              {featuredReview.customerName ?? 'Anonymous'}
+            </span>
+            <span className="review-stars">
+              {'★'.repeat(featuredReview.stars)}{'☆'.repeat(5 - featuredReview.stars)}
+            </span>
           </div>
-          <p className="review-text">"{review.messages[0]}"</p>
+          {featuredReview.text && (
+            <p className="review-text">"{featuredReview.text}"</p>
+          )}
+          {reviewCount > 1 && (
+            <p className="review-more">...and {reviewCount - 1} other review{reviewCount > 2 ? 's' : ''} today</p>
+          )}
         </div>
       )}
 
@@ -279,19 +299,8 @@ export function ShopScreen() {
         </div>
       )}
 
-      <button onClick={() => {
-        // MBW-83/84: Roll for Game Day event and update pity timer in save
-        const event = rollNextDayEvent(gameSave)
-        setPendingEvent(event)
-        if (event) {
-          updateSave({ daysSinceLastGameDay: 0 })
-          goToScreen('EVENT_NOTICE')
-        } else {
-          updateSave({ daysSinceLastGameDay: gameSave.daysSinceLastGameDay + 1 })
-          goToScreen('DAY_IN_PROGRESS')
-        }
-      }}>
-        Start Day {gameSave.dayNumber}
+      <button onClick={handleStartNext}>
+        {isEndOfWeek ? 'Weekly Report' : `Start Day ${gameSave.dayNumber}`}
       </button>
     </div>
   )

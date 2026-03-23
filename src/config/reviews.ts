@@ -2,7 +2,16 @@
 // Each entry has tags that match day performance and a ratingRange for the current
 // game star rating. At least 2 message variants per entry for variety.
 
-import type { ReviewEntry } from '../types/review'
+// MBW-NEW: This file is kept for reference but no longer used by the active review system.
+// The new ReviewSystem generates reviews dynamically from events.
+// Types here are legacy — kept to avoid breaking any imports in git history.
+interface ReviewEntry {
+  name: string
+  reviewStars: number
+  tags: string[]
+  ratingRange: { min: number; max: number }
+  messages: string[]
+}
 
 export const REVIEWS: ReviewEntry[] = [
   // ── Fast service, busy day, high rating ───────────────────────────────────

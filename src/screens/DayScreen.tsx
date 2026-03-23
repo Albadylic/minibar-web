@@ -13,6 +13,7 @@ import { barScene } from '../engine/renderer/barScene'
 import { customerRenderer } from '../engine/renderer/customerRenderer'
 import { flyupRenderer } from '../engine/renderer/flyupRenderer'
 import { drinkServingSystem } from '../engine/systems/drinkServingSystem'
+import { reviewSystem } from '../engine/systems/reviewSystem'
 import { brawlSystem } from '../engine/systems/brawlSystem'
 import { securitySystem } from '../engine/systems/securitySystem'
 import { cleaningSystem } from '../engine/systems/cleaningSystem'
@@ -45,7 +46,7 @@ export function DayScreen() {
 
     // MBW-83: pendingEvent was rolled in ShopScreen; pass it to DayConfig
     const dayConfig = generateDayConfig(save, pendingEvent)
-    gameLoop.start(dayConfig, save.coins, save.starRating, unlockedDrinks)
+    gameLoop.start(dayConfig, save.coins, unlockedDrinks)
     // MBW-147/160: Extra Seating upgrade tier controls which seats are active
     const extraSeatTier = save.upgrades['extra_seating']?.tier ?? 0
     customerSystem.setExtraSeatTier(extraSeatTier)
@@ -53,8 +54,10 @@ export function DayScreen() {
     const bouncerTier = (save.upgrades['bouncer']?.tier ?? 0) as 0 | 1 | 2 | 3
     securitySystem.init(bouncerTier)
     drinkServingSystem.init()
+    reviewSystem.init()
 
     return () => {
+      reviewSystem.destroy()
       drinkServingSystem.destroy()
       brawlSystem.destroy()
       securitySystem.destroy()
@@ -170,24 +173,17 @@ function PixiLoadingOverlay() {
   )
 }
 
-// MBW-37/66: Color-coded star rating display with gain/loss animation
-function StarRating({ rating }: { rating: number }) {
-  const [animClass, setAnimClass] = useState('')
-  const prevRating = useRef(rating)
-
-  useEffect(() => {
-    if (rating === prevRating.current) return
-    const gained = rating > prevRating.current
-    prevRating.current = rating
-    setAnimClass(gained ? 'star-gain' : 'star-loss')
-    const t = setTimeout(() => setAnimClass(''), 400)
-    return () => clearTimeout(t)
-  }, [rating])
-
-  const color = rating > 3 ? '#44cc44' : rating >= 2 ? '#ddcc00' : '#cc2222'
+// MBW-NEW: Rating display — shows displayedRating (stable all day) or "NEW" badge in Week 1
+function RatingDisplay({ rating, dayNumber }: { rating: number; dayNumber: number }) {
+  const isWeekOne = dayNumber <= 7
+  if (isWeekOne) {
+    return <span className="hud-stars hud-stars-new">NEW</span>
+  }
+  const color = rating >= 4 ? '#44cc44' : rating >= 3 ? '#ddcc00' : '#cc2222'
+  const display = rating === 0 ? '—' : rating.toFixed(1)
   return (
-    <span className={`hud-stars ${animClass}`} style={{ color }}>
-      ★ {rating.toFixed(1)}
+    <span className="hud-stars" style={{ color }}>
+      ★ {display}
     </span>
   )
 }
@@ -237,7 +233,7 @@ function TipPromptOverlay() {
 }
 
 function DayHud({ dayNumber }: { dayNumber: number }) {
-  const { timeRemaining, coins, starRating, performingEntertainer } = useHudStore()
+  const { timeRemaining, coins, displayedRating, performingEntertainer } = useHudStore()
 
   // MBW-185: Single forward-counting game clock (12:00 → 00:00 over 120s)
   const elapsed = DAY_DURATION - timeRemaining
@@ -250,7 +246,7 @@ function DayHud({ dayNumber }: { dayNumber: number }) {
     <div className="hud">
       <span className="hud-day">Day {dayNumber}</span>
       <span className="hud-timer">{clockStr}</span>
-      <StarRating rating={starRating} />
+      <RatingDisplay rating={displayedRating} dayNumber={dayNumber} />
       <span className="hud-coins">🪙 {coins}</span>
       {performingEntertainer && (
         <span className="hud-entertainer">♪ {performingEntertainer}</span>
