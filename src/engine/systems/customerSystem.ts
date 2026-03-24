@@ -95,11 +95,14 @@ class CustomerSystem {
 
     if (this.timeSinceLastSpawn < interval) return
 
-    const availableSeat = this.pickAvailableSeat()
+    // Roll type first so pickAvailableSeat can apply rich-clientele mess tolerance
+    let customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
+    const availableSeat = this.pickAvailableSeat(customerType === 'RICH')
     if (!availableSeat) return // bar full
 
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
+<<<<<<< new-reviews
 
     // MBW-NEW: Regulars only appear from Week 2 onward (dayNumber > 7), max one per day
     const { gameSave } = useGameStore.getState()
@@ -122,6 +125,8 @@ class CustomerSystem {
     }
 
     let customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
+=======
+>>>>>>> main
     // MBW-181: Doorman tier 2 — chance to turn away a hooligan at the door
     if (customerType === 'HOOLIGAN' && dayConfig.modifiers.hooliganFilterChance > 0 && Math.random() < dayConfig.modifiers.hooliganFilterChance) {
       customerType = 'NORMAL'
@@ -151,13 +156,13 @@ class CustomerSystem {
     return 'DRUNK'
   }
 
-  private pickAvailableSeat(): (typeof SEATS)[number] | null {
-    // MBW-167: Exclude seats blocked by uncleaned glasses
+  private pickAvailableSeat(isRich = false): (typeof SEATS)[number] | null {
+    // MBW-167: Exclude seats deterred by uncleaned glasses (threshold varies by customer type)
     // MBW-147/160: Exclude seats that require a higher Extra Seating tier than the player owns
     const available = SEATS.filter(
       (s) =>
         !this.occupiedSeatIds.has(s.id) &&
-        !cleaningSystem.isBlocked(s.id) &&
+        !cleaningSystem.isBlocked(s.id, isRich) &&
         (s.upgradeRequired === null || s.upgradeRequired <= this.extraSeatTier),
     )
     if (available.length === 0) return null

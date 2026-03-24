@@ -1,10 +1,10 @@
 # Minibar-Web
 
-A medieval tavern management browser game. You're the barkeep — serve drinks to customers before their patience runs out, survive increasingly hectic days, and spend your earnings on upgrades between rounds. Days get harder, customers get rowdier, and the star rating keeps you honest.
+A medieval tavern management browser game. You're the barkeep — serve drinks to customers before their patience runs out, survive increasingly hectic days, and spend your earnings on upgrades between rounds.
 
 **Stack:** React 19 · TypeScript 5.7 (strict) · PixiJS v8 · Zustand v5 · Vite v6 · PWA
 
-> Placeholder graphics are in use until sprite assets land in V1.5.
+> Placeholder graphics are in use until sprite assets land in a future release.
 
 ---
 
@@ -43,68 +43,113 @@ npm run preview  # verify the build locally before deploying
 
 ```
 src/
-  screens/        # React screens: MainMenu, DayScreen, ShopScreen, GameOver
+  screens/        # React screens: MainMenu, Day, Shop, GameOver, EventNotice
   engine/
-    systems/      # Customer spawning, patience, drink serving, entertainer, cleaner
+    systems/      # All game logic systems (see below)
     events/       # Typed event dispatcher
     renderer/     # PixiJS scene management, sprite factories
-  entities/       # Customer, Entertainer entity models
+  entities/       # Entity models: Customer, Entertainer, Brawl, Mess, Security, Waiter
   config/         # All balance data (never hardcoded in logic)
-  store/          # Zustand store + localStorage persist middleware
-  components/     # React UI components (HUD, patience bar, etc.)
-  audio/          # Howler.js audio manager (V1.5+)
-  assets/         # Sprite sheets, fonts
+  store/          # Zustand stores (persisted + transient)
   types/          # TypeScript interfaces
 public/           # PWA icons, apple-touch-icon
 ```
 
-### Architecture
+### App state machine
 
-- **4 app states:** `MAIN_MENU → DAY_IN_PROGRESS → BETWEEN_DAY_SHOP → GAME_OVER`
-- The PixiJS canvas lives only inside `DayScreen`; everything else is React.
-- **Game loop:** `requestAnimationFrame` with a fixed-timestep accumulator (60 ticks/s).
-- **Canvas resolution:** fixed logical size 375×667, CSS-scaled with letterboxing for any screen.
-- **Persistence:** Zustand persist middleware writes to `localStorage` key `minibar-save`.
+Five screens managed via Zustand `screen` state in `gameStore.ts`:
+
+```
+MAIN_MENU → DAY_IN_PROGRESS → BETWEEN_DAY_SHOP → DAY_IN_PROGRESS → ...
+                                      ↓ (event announced)
+                               EVENT_NOTICE → DAY_IN_PROGRESS
+                                      ↓ (star rating ≤ 1.0)
+                                  GAME_OVER
+```
+
+### Game loop
+
+- `requestAnimationFrame` with a fixed-timestep accumulator (60 ticks/s)
+- Canvas: fixed logical resolution 375×667, CSS-scaled with letterboxing
+- Persistence: Zustand persist middleware → `localStorage` key `minibar-save`
+
+### Systems
+
+| System | Responsibility |
+|---|---|
+| `customerSystem` | Spawning, pathfinding, patience decay, phase-weighted arrival |
+| `drinkServingSystem` | Tap selection, serve validation, coin/rating updates |
+| `reviewSystem` | End-of-day review selection based on day performance |
+| `brawlSystem` | Hooligan brawl initiation, collateral damage, resolution |
+| `cleaningSystem` | Glass mess spawning, cleaner NPC pathfinding, tap-to-clean |
+| `entertainerSystem` | Performer arrival, tip prompts, patience/coin effects |
+| `kingsTraySystem` | Special drink order for Noble's Visit event |
+| `securitySystem` | Bouncer NPC — auto-ejects brawlers |
+| `waiterSystem` | Waiter NPC — autonomously serves table orders |
 
 ### Configuration
 
-All balance values live in `src/config/` — they are never hardcoded inside systems or components. Key files:
+All balance values live in `src/config/` — never hardcoded inside systems:
 
 | File | Contents |
 |---|---|
+| `barLayout.ts` | Seat positions, table geometry, canvas constants |
+| `customers.ts` | Customer types, patience, reward/penalty, walk speed |
 | `drinks.ts` | Drink definitions and unlock order |
-| `customers.ts` | Customer types, patience, reward/penalty values |
-| `upgrades.ts` | Shop upgrade catalogue |
-| `events.ts` | Random event definitions |
+| `upgrades.ts` | Shop upgrade catalogue (seating, staff, ambience, environment) |
+| `events.ts` | Random event definitions and roll logic |
 | `difficulty.ts` | Per-day difficulty scaling |
-| `barLayout.ts` | Seat positions and bar geometry |
-| `entertainers.ts` | Entertainer stats and effects |
-| `reviews.ts` | End-of-day review strings |
+| `entertainers.ts` | Entertainer stats, tip tiers, XP thresholds |
+| `reviews.ts` | End-of-day review strings and tag rules |
+| `tutorials.ts` | Tutorial popup triggers and copy |
 
-Code comments reference ticket IDs where relevant: `// MBW-47: description`.
+Code comments reference ticket IDs: `// MBW-47: description`.
 
 ---
 
 ## Gameplay
 
-- **Serve drinks:** click a tap to pick up a drink, then click a customer to serve it.
-- **Correct serves** earn coins; wrong drinks cost star rating.
+- **Serve drinks:** click a tap to select a drink, then click a customer to serve it.
+- **Correct serves** earn coins; wrong drinks or expired patience cost star rating.
 - **A day lasts 120 seconds** across four phases: Morning (0–30s) · Afternoon (30–60s) · Evening (60–90s) · Night (90–120s). Last Orders fires at 100s.
-- **Between days:** spend coins in the shop on upgrades (speed, capacity, new drinks, etc.).
+- **Between days:** spend coins in the shop on upgrades, then the next day begins.
 - **Game over** if star rating drops to or below 1.0.
 
 ### Customer types
 
-| Type | Notes |
+| Type | Behaviour |
 |---|---|
 | Normal | Standard patience and reward |
-| Rich Clientele | High reward, harsh penalty for mistakes |
-| The Drunk | Must be escorted out, not served |
-| Hooligans | Arrive on Game Day; may trigger brawls |
+| Rich Clientele | High coin reward; harsher star penalty for mistakes |
+| The Drunk | Blocks a seat without ordering — must be escorted out |
+| Hooligans | Spawn on Game Days; may trigger brawls that damage nearby customers |
 
-Special events (Market Day, Noble's Visit, Harvest Festival, Bard Night) and entertainers (Jinx, Roland, Melody) arrive in later versions.
+### Events
 
-> Screenshot coming in V1.5 once sprite assets are in place.
+Random events are announced on the `EVENT_NOTICE` screen before certain days:
+
+| Event | Effect |
+|---|---|
+| Game Day | Hooligans may appear; higher footfall |
+| Market Day | Increased customer volume; coin multiplier |
+| Noble's Visit | Rich clientele surge; King's Tray special order |
+| Harvest Festival | Extended patience across all customers |
+| Bard Night | Patience boost while entertainer performs |
+
+### Entertainers
+
+Three entertainers (Jinx, Roland, Melody) visit the stage periodically. Each has a hidden level and XP system. A tip prompt appears at Last Orders — generous tips increase their return likelihood.
+
+### Staff upgrades
+
+Hire and level up staff from the shop:
+
+| Staff | Effect |
+|---|---|
+| Cleaner | NPC walks to messes and cleans them autonomously |
+| Waiter | NPC serves table orders so you can focus on the bar |
+| Doorman | Reduces drunk/hooligan entry; boosts rich clientele patience |
+| Bouncer | Auto-ejects brawlers; reduces star damage from fights |
 
 ---
 
