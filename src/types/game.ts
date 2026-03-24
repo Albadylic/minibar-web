@@ -1,12 +1,19 @@
 // MBW-6: Top-level game states
-export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'EVENT_NOTICE'
+// MBW-NEW: WEEKLY_REPORT screen added for end-of-week rating reveal
+export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'EVENT_NOTICE' | 'WEEKLY_REPORT'
 
 // MBW-3: GameSave — persisted to localStorage via Zustand
+import type { Review, WeeklyHistoryEntry } from './review'
+
 export interface GameSave {
   // Core progression
   dayNumber: number
-  starRating: number
   coins: number
+
+  // MBW-NEW: Weekly review system — replaces real-time starRating
+  displayedRating: number           // Rolling weighted average (0 until first rated week)
+  weeklyHistory: WeeklyHistoryEntry[]  // Last 4 completed weeks
+  currentWeekReviews: Review[]         // Reviews accumulated this week (cleared at week end)
 
   // Upgrades owned
   upgrades: Record<string, { tier: number; purchasedOnDay: number }>
@@ -42,12 +49,14 @@ export interface GameSave {
   version: number
 }
 
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export const initialGameSave: GameSave = {
   dayNumber: 1,
-  starRating: 3.0,
   coins: 0,
+  displayedRating: 0,
+  weeklyHistory: [],
+  currentWeekReviews: [],
   upgrades: {},
   barCapacity: 13,
   unlockedDrinks: ['lager', 'ale'],

@@ -14,10 +14,10 @@ import { SEATS, SEATS_BY_ID, TABLES, DOORWAY } from '../../config/barLayout'
 import type { TableConfig } from '../../config/barLayout'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { eventDispatcher } from '../events/eventDispatcher'
-import { gameLoop } from '../gameLoop'
-import { STAR_RATING } from '../../config/difficulty'
 import { entertainerSystem } from './entertainerSystem'
 import { cleaningSystem } from './cleaningSystem'
+import { REGULARS } from '../../config/regulars'
+import { useGameStore } from '../../store/gameStore'
 
 // Obstacle clearance margin for customer path avoidance — seats are 12px outside table edges,
 // so margin=10 keeps seats just outside the exclusion zone while still avoiding visual overlap
@@ -31,12 +31,15 @@ class CustomerSystem {
   private unlockedDrinks: string[] = []
   // MBW-147/160: Extra Seating upgrade tier gates which seats customers can use
   private extraSeatTier = 0
+  // MBW-NEW: Track which regulars have already spawned today (max one visit per day per regular)
+  private regularsSpawendToday = new Set<string>()
 
   reset(): void {
     this.customers = []
     this.occupiedSeatIds.clear()
     this.timeSinceLastSpawn = 0
     this.unlockedDrinks = []
+    this.regularsSpawendToday.clear()
     resetCustomerIdCounter()
   }
 
@@ -99,6 +102,27 @@ class CustomerSystem {
 
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
+
+    // MBW-NEW: Regulars only appear from Week 2 onward (dayNumber > 7), max one per day
+    const { gameSave } = useGameStore.getState()
+    if (gameSave.dayNumber > 7 && this.regularsSpawendToday.size === 0) {
+      const pendingRegular = REGULARS.find(
+        (r) => Math.random() < r.visitChancePerDay,
+      )
+      if (pendingRegular) {
+        this.regularsSpawendToday.add(pendingRegular.id)
+        this.spawnCustomer(
+          availableSeat.id,
+          availableSeat.position,
+          unlockedDrinks,
+          dayConfig.modifiers.patienceMultiplier,
+          'NORMAL',
+          pendingRegular,
+        )
+        return
+      }
+    }
+
     // MBW-181: Doorman tier 2 — chance to turn away a hooligan at the door
     if (customerType === 'HOOLIGAN' && dayConfig.modifiers.hooliganFilterChance > 0 && Math.random() < dayConfig.modifiers.hooliganFilterChance) {
       customerType = 'NORMAL'
@@ -147,9 +171,10 @@ class CustomerSystem {
     unlockedDrinks: string[],
     patienceMultiplier: number,
     type: CustomerType = 'NORMAL',
+    regular?: { id: string; skin: import('../../entities/customer').CustomerSkin },
   ): void {
     const config = CUSTOMER_CONFIGS[type]
-    const skin = randomSkin()
+    const skin = regular ? regular.skin : randomSkin()
     const patienceMax = randomInRange(config.patience.min, config.patience.max) * patienceMultiplier
     // MBW-86: Weighted drink selection by customer type affinity
     const drinkOrder = this.rollDrinkOrder(unlockedDrinks, type)
@@ -176,6 +201,9 @@ class CustomerSystem {
       canBrawl: config.canBrawl,
       canBeServed: config.canBeServed,
       coinMultiplier: config.coinMultiplier,
+      // MBW-NEW: Regular customer identity
+      isRegular: regular !== undefined,
+      regularId: regular?.id,
     }
 
     this.occupiedSeatIds.add(seatId)
@@ -254,12 +282,7 @@ class CustomerSystem {
         return
       }
 
-      // Normal customer — star rating loss and leave
-      const isGameOver = gameLoop.adjustStarRating(-STAR_RATING.lossPerBadReview)
-      if (isGameOver) {
-        gameLoop.triggerGameOver()
-        return
-      }
+      // Normal customer — leave (review system handles rating impact separately)
       this.startLeaving(customer)
     }
   }

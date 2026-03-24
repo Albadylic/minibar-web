@@ -1,36 +1,45 @@
-// MBW-59/60: Types for the end-of-day review system
-// MBW-112: Event-specific tags added
+// MBW-NEW: Weekly review cycle — replaces old real-time star rating system.
+// Reviews are generated per-customer-event and accumulate into weekly reports.
 
-export type ReviewTag =
-  | 'fast_service'      // many serves, no wrong drinks
-  | 'slow_service'      // very few customers served
-  | 'wrong_drinks'      // at least one wrong drink served
-  | 'busy_day'          // high customer volume
-  | 'quiet_day'         // low customer volume
-  | 'improving'         // star rating went up
-  | 'declining'         // star rating fell significantly
-  | 'generic'           // always eligible — used as fallback
-  | 'game_day'          // MBW-112: Game Day event
-  | 'market_day'        // MBW-112: Market Day event
-  | 'kings_visit'       // MBW-112: Noble's Visit event
-  | 'harvest_festival'  // MBW-112: Harvest Festival event
-  | 'bard_night'        // MBW-112: Bard Night event
+import type { CustomerType } from '../entities/customer'
+import type { EventType } from '../types/day'
 
-export interface ReviewEntry {
-  name: string
-  reviewStars: number
-  tags: ReviewTag[]
-  ratingRange: { min: number; max: number }
-  messages: string[]
+export type ReviewTrigger =
+  | 'SERVED_FAST'       // Patience > 50% remaining
+  | 'SERVED_NORMAL'     // Patience 25–50% remaining
+  | 'SERVED_SLOW'       // Patience < 25% remaining
+  | 'UNSERVED'          // Patience expired, customer left
+  | 'WRONG_DRINK'       // Wrong drink served
+  | 'BRAWL_VICTIM'      // Caught in a brawl
+
+export interface Review {
+  id: string
+  day: number             // Day number (absolute, e.g. 8, 9...)
+  weekNumber: number      // Which week this belongs to (1, 2, 3...)
+  stars: number           // 1–5
+  customerType: CustomerType
+  customerName?: string   // Set for regulars and named NPCs
+  isRegular: boolean
+  regularId?: string      // e.g. 'bjorn_blacksmith'
+  trigger: ReviewTrigger
+  text?: string           // Yelp-style snippet for featured reviews
 }
 
-// Snapshot of a completed day — passed to the review system and stored between screens
+// Snapshot of a completed day — passed to ShopScreen
 export interface DayResult {
   dayNumber: number
   customersServed: number
   wrongDrinks: number
   coinsEarned: number
-  starRatingDelta: number
-  finalRating: number
-  eventType: import('../types/day').EventType | null  // MBW-112: event that ran this day
+  eventType: EventType | null
+  featuredReview: Review | null   // Priority: regular > named NPC > most extreme anon
+  reviewCount: number             // Total reviews generated today
+}
+
+// Weekly summary entry — stored in weeklyHistory
+export interface WeeklyHistoryEntry {
+  weekNumber: number
+  averageRating: number
+  totalReviews: number
+  reviewsByStars: [number, number, number, number, number]  // counts for 1★–5★
 }

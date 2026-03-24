@@ -1,13 +1,12 @@
 // MBW-26: Drink selection (click tap to select/deselect)
 // MBW-27: Serve action (click customer with drink selected)
 // MBW-28: Coin reward on correct serve
+// MBW-NEW: Star rating adjustments removed — review system handles reputation now
 import { eventDispatcher } from '../events/eventDispatcher'
 import { gameLoop } from '../gameLoop'
 import { customerSystem } from './customerSystem'
 import { barScene } from '../renderer/barScene'
 import { DRINKS_BY_ID } from '../../config/drinks'
-import { STAR_RATING } from '../../config/difficulty'
-import { CUSTOMER_CONFIGS } from '../../config/customers'
 import { entertainerSystem } from './entertainerSystem'
 
 class DrinkServingSystem {
@@ -47,13 +46,13 @@ class DrinkServingSystem {
     if (isCorrect) {
       // MBW-28/91: Award coins with type multiplier (rich = 1.8×) + tip jar on fast serves
       const isFastServe = customer.patienceTimer / customer.patienceMax > 0.5
-      const coins = Math.round((drink?.coinReward ?? 0) * customer.coinMultiplier * gameLoop.dayCoinMultiplier * entertainerSystem.getCoinBoostMult()) + (isFastServe ? gameLoop.tipJarBonus : 0)
+      const coins = Math.round(
+        (drink?.coinReward ?? 0) *
+          customer.coinMultiplier *
+          gameLoop.dayCoinMultiplier *
+          entertainerSystem.getCoinBoostMult(),
+      ) + (isFastServe ? gameLoop.tipJarBonus : 0)
       gameLoop.addCoins(coins)
-
-      // Star rating gain — skill bonus if patience still > 50%
-      const starDelta =
-        STAR_RATING.gainPerCorrectServe + (isFastServe ? STAR_RATING.skillBonusGain : 0)
-      gameLoop.adjustStarRating(starDelta)
       gameLoop.recordCustomerServed()
 
       customerSystem.serveCustomer(customerId)
@@ -65,18 +64,10 @@ class DrinkServingSystem {
         coinsEarned: coins,
       })
     } else {
-      // MBW-94: Rich customers cause a harsher rating hit when served wrong drink
-      const config = CUSTOMER_CONFIGS[customer.type]
-      const starLoss = config.harshReview ? STAR_RATING.lossPerHarshReview : STAR_RATING.lossPerWrongDrink
-      const isGameOver = gameLoop.adjustStarRating(-starLoss)
       gameLoop.recordWrongDrink()
       customerSystem.wrongDrink(customerId)
 
       eventDispatcher.emit('WRONG_DRINK', { customerId, drinkId: selectedDrinkId })
-
-      if (isGameOver) {
-        gameLoop.triggerGameOver()
-      }
     }
   }
 

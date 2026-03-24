@@ -25,7 +25,8 @@ export type GameEventMap = {
   // MBW-77/78/80: Brawl events
   BRAWL_STARTED: { brawlId: string; instigatorId: string; affectedCount: number }
   BRAWLER_TAPPED: { brawlId: string; tapsReceived: number; tapsRequired: number }
-  BRAWL_RESOLVED: { brawlId: string; byPlayer: boolean }
+  // MBW-NEW: disruptedCount added so ReviewSystem can generate the right number of reviews
+  BRAWL_RESOLVED: { brawlId: string; byPlayer: boolean; disruptedCount: number }
 
   // MBW-97: Drunk escort
   DRUNK_ESCORTED: { customerId: string; byPlayer: boolean }

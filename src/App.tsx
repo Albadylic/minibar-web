@@ -7,6 +7,7 @@ import { DayScreen } from './screens/DayScreen'
 import { ShopScreen } from './screens/ShopScreen'
 import { GameOverScreen } from './screens/GameOverScreen'
 import { EventNoticeScreen } from './screens/EventNoticeScreen'
+import { WeeklyReportScreen } from './screens/WeeklyReportScreen'
 import './App.css'
 
 export function App() {
@@ -25,6 +26,8 @@ export function App() {
         return <GameOverScreen />
       case 'EVENT_NOTICE':
         return <EventNoticeScreen />
+      case 'WEEKLY_REPORT':
+        return <WeeklyReportScreen />
     }
   }
 

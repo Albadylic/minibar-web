@@ -5,9 +5,7 @@ import type { BrawlEntity } from '../../entities/brawl'
 import { nextBrawlId } from '../../entities/brawl'
 import { customerSystem } from './customerSystem'
 import { eventDispatcher } from '../events/eventDispatcher'
-import { gameLoop } from '../gameLoop'
 import { BRAWL, getBrawlTapsRequired } from '../../config/difficulty'
-import { STAR_RATING } from '../../config/difficulty'
 import { SEATS, SEATS_BY_ID } from '../../config/barLayout'
 
 class BrawlSystem {
@@ -153,10 +151,6 @@ class BrawlSystem {
 
     brawl.disruptedCustomerIds.push(victim.id)
     customerSystem.disruptByBrawler(victim.id)
-    const isGameOver = gameLoop.adjustStarRating(-BRAWL.starLossPerCasualty)
-    if (isGameOver) {
-      gameLoop.triggerGameOver()
-    }
   }
 
   // MBW-150: Pick a random occupied seat (other than instigator's seat) as the next roam target
@@ -180,13 +174,10 @@ class BrawlSystem {
     // Eject the instigator
     customerSystem.forceLeaveBrawl(brawl.instigatorId)
 
-    // Auto-resolve is worse — extra rating hit for letting it escalate
-    if (!byPlayer) {
-      gameLoop.adjustStarRating(-STAR_RATING.lossPerBadReview)
-    }
-
+    // MBW-NEW: Pass disrupted count so ReviewSystem can generate the right number of reviews
+    const disruptedCount = brawl.disruptedCustomerIds.length
     this.brawls.splice(idx, 1)
-    eventDispatcher.emit('BRAWL_RESOLVED', { brawlId, byPlayer })
+    eventDispatcher.emit('BRAWL_RESOLVED', { brawlId, byPlayer, disruptedCount })
   }
 
   // MBW-88: Called by securitySystem when bouncer resolves a brawl

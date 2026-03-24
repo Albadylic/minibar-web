@@ -9,7 +9,6 @@ import { eventDispatcher } from '../events/eventDispatcher'
 import { BAR_COUNTER_TOP } from '../../config/barLayout'
 
 const KINGS_TRAY_PAYOUT = 200  // coins awarded on full completion
-const KINGS_TRAY_STAR_PENALTY = 0.4  // star loss when king arrives to empty/partial tray
 const SLOT_RADIUS = 8
 const SLOT_SPACING = 26  // centre-to-centre distance between slots
 const TRAY_PADDING = 10
@@ -137,11 +136,9 @@ class KingsTraySystem {
       gameLoop.addCoins(KINGS_TRAY_PAYOUT)
       eventDispatcher.emit('KINGS_TRAY_RESOLVED', { complete: true, coinsEarned: KINGS_TRAY_PAYOUT })
     } else {
-      const isGameOver = gameLoop.adjustStarRating(-KINGS_TRAY_STAR_PENALTY)
+      // MBW-NEW: Star rating no longer adjusted in real-time; kings tray failure
+      // is handled by the review system (the noble visit generates negative reviews)
       eventDispatcher.emit('KINGS_TRAY_RESOLVED', { complete: false, coinsEarned: 0 })
-      if (isGameOver) {
-        gameLoop.triggerGameOver()
-      }
     }
 
     // Dim the tray to signal resolution

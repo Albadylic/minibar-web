@@ -31,6 +31,9 @@ export interface CustomerEntity {
   canBrawl: boolean       // MBW-72: copied from CustomerTypeConfig at spawn
   canBeServed: boolean    // MBW-95: false for DRUNK — can't be given a drink
   coinMultiplier: number  // MBW-91: multiplier on drink coin reward (1.8× for RICH)
+  // MBW-NEW: Regular customer — always leaves a review, rendered green
+  isRegular: boolean
+  regularId?: string      // matches RegularConfig.id (e.g. 'bjorn_blacksmith')
 }
 
 let _nextId = 0
