@@ -480,11 +480,19 @@ class CustomerSystem {
     this.startLeaving(customer)
   }
 
-  // MBW-150: Called when brawler reaches a seat — cancels that customer's order and ejects them
+  // MBW-150: Called when brawler reaches a seat — hooligans fight back (start brawling),
+  // everyone else gets ejected
   disruptByBrawler(customerId: string): void {
     const customer = this.customers.find((c) => c.id === customerId)
     if (!customer) return
-    this.startLeaving(customer)
+    if (customer.status === 'BRAWLING') {
+      // Two brawlers clashing — ignore, both keep fighting
+    } else if (customer.canBrawl) {
+      customer.status = 'BRAWLING'
+      eventDispatcher.emit('PATIENCE_EXPIRED', { customerId: customer.id })
+    } else {
+      this.startLeaving(customer)
+    }
   }
 
   getCustomer(id: string): CustomerEntity | undefined {
