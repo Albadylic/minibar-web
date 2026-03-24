@@ -36,8 +36,13 @@ class CleaningSystem {
   private messDisplays = new Map<string, Graphics>()
   private cleanerGraphic: Graphics | null = null
   private cleaner: CleanerState = { active: false, position: { ...CLEANER_START }, targetMessId: null, targetTableId: null, waypoints: [], speed: 80, noIdlePause: false, idlePauseRemaining: 0 }
-  // MBW-167: Seats blocked because they have a mess on them
-  private blockedSeatIds = new Set<string>()
+  // MBW-167: Thresholds for how many glasses it takes to deter a new customer
+  // Bar stools: 2 glasses for normal customers, 1 for rich clientele
+  // Table chairs: 4 glasses (whole table) for normal, 2 for rich clientele
+  private static readonly BLOCK_THRESHOLD_BAR_NORMAL = 2
+  private static readonly BLOCK_THRESHOLD_BAR_RICH = 1
+  private static readonly BLOCK_THRESHOLD_TABLE_NORMAL = 4
+  private static readonly BLOCK_THRESHOLD_TABLE_RICH = 2
 
   init(app: Application, cleanerSpeed: number | null, noIdlePause = false): void {
     this.stage = new Container()
@@ -64,7 +69,6 @@ class CleaningSystem {
     this.stage = null
     this.messDisplays.clear()
     this.messes = []
-    this.blockedSeatIds.clear()
     this.cleanerGraphic = null
     this.cleaner.active = false
   }
@@ -72,7 +76,6 @@ class CleaningSystem {
   reset(): void {
     this.messes = []
     this.messDisplays.clear()
-    this.blockedSeatIds.clear()
     this.cleaner.position = { ...CLEANER_START }
     this.cleaner.targetMessId = null
     this.cleaner.targetTableId = null
@@ -80,9 +83,29 @@ class CleaningSystem {
     this.cleaner.idlePauseRemaining = 0
   }
 
-  // MBW-167: Returns true if a seat is blocked by an uncleaned mess
-  isBlocked(seatId: string): boolean {
-    return this.blockedSeatIds.has(seatId)
+  // MBW-167: Returns true if a seat is deterred by uncleaned glasses.
+  // Thresholds vary by customer type (rich clientele have higher expectations).
+  // Below the threshold a probabilistic check applies; at or above it the seat is always skipped.
+  isBlocked(seatId: string, isRich = false): boolean {
+    const seat = SEATS_BY_ID[seatId]
+    if (!seat) return false
+
+    let glassCount: number
+    let threshold: number
+
+    if (seat.type === 'bar_stool') {
+      glassCount = this.messes.filter((m) => m.seatId === seatId).length
+      threshold = isRich ? CleaningSystem.BLOCK_THRESHOLD_BAR_RICH : CleaningSystem.BLOCK_THRESHOLD_BAR_NORMAL
+    } else {
+      // Count all glasses on the same table
+      glassCount = this.messes.filter((m) => m.tableId !== null && m.tableId === seat.tableId).length
+      threshold = isRich ? CleaningSystem.BLOCK_THRESHOLD_TABLE_RICH : CleaningSystem.BLOCK_THRESHOLD_TABLE_NORMAL
+    }
+
+    if (glassCount === 0) return false
+    if (glassCount >= threshold) return true
+    // Probabilistic deterrence for partial messiness
+    return Math.random() < glassCount / threshold
   }
 
   // MBW-166: Glass left at seat when customer leaves (bar counter for stools, table surface for chairs)
@@ -128,8 +151,6 @@ class CleaningSystem {
       : Math.max(FLOOR_TOP + 5, Math.min(FLOOR_BOTTOM - 5, y))
 
     const mess: MessEntity = { id: nextMessId(), position: { x: clampedX, y: clampedY }, seatId, tableId }
-    // MBW-167: Block the associated seat
-    if (seatId) this.blockedSeatIds.add(seatId)
     this.messes.push(mess)
 
     if (!this.stage) return
@@ -152,8 +173,6 @@ class CleaningSystem {
     const idx = this.messes.findIndex((m) => m.id === messId)
     if (idx === -1) return
     const mess = this.messes[idx]!
-    // MBW-167: Unblock the seat when mess is cleaned
-    if (mess.seatId) this.blockedSeatIds.delete(mess.seatId)
     this.messes.splice(idx, 1)
 
     const g = this.messDisplays.get(messId)
@@ -337,11 +356,13 @@ class CleaningSystem {
     const bt = blockingTable
     const halfW = bt.width / 2 + MARGIN
     const halfH = bt.height / 2 + MARGIN
+    const clampX = (x: number) => Math.max(10, Math.min(CANVAS_WIDTH - 10, x))
+    const clampY = (y: number) => Math.max(FLOOR_TOP + 5, Math.min(FLOOR_BOTTOM - 5, y))
     const corners = [
-      { x: bt.position.x - halfW, y: bt.position.y - halfH },
-      { x: bt.position.x + halfW, y: bt.position.y - halfH },
-      { x: bt.position.x - halfW, y: bt.position.y + halfH },
-      { x: bt.position.x + halfW, y: bt.position.y + halfH },
+      { x: clampX(bt.position.x - halfW), y: clampY(bt.position.y - halfH) },
+      { x: clampX(bt.position.x + halfW), y: clampY(bt.position.y - halfH) },
+      { x: clampX(bt.position.x - halfW), y: clampY(bt.position.y + halfH) },
+      { x: clampX(bt.position.x + halfW), y: clampY(bt.position.y + halfH) },
     ]
     let bestCorner = corners[0]!
     let bestCost = Infinity
