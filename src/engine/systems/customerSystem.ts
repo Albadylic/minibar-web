@@ -101,11 +101,11 @@ class CustomerSystem {
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
 
-    // MBW-NEW: Regulars only appear from Week 2 onward (dayNumber > 7)
+    // MBW-NEW: Regulars only appear from Week 2 onward (dayNumber > 7), max one per day
     const { gameSave } = useGameStore.getState()
-    if (gameSave.dayNumber > 7) {
+    if (gameSave.dayNumber > 7 && this.regularsSpawendToday.size === 0) {
       const pendingRegular = REGULARS.find(
-        (r) => !this.regularsSpawendToday.has(r.id) && Math.random() < r.visitChancePerDay,
+        (r) => Math.random() < r.visitChancePerDay,
       )
       if (pendingRegular) {
         this.regularsSpawendToday.add(pendingRegular.id)

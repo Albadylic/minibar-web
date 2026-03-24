@@ -211,6 +211,167 @@
   color: #cc2222 !important;
 }
 
+/* Weekly report */
+.weekly-report-screen {
+  justify-content: center;
+  gap: 16px;
+}
+
+.weekly-stats-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  background: #2a1a08;
+  border: 1px solid #8b6331;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.star-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.star-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.star-breakdown-label {
+  font-size: 0.85rem;
+  color: #c8a96e;
+  width: 28px;
+}
+
+.star-breakdown-count {
+  font-size: 0.85rem;
+  color: #e8d8b0;
+  min-width: 20px;
+}
+
+.star-breakdown-total {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: #a08060;
+}
+
+.weekly-average-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 4px;
+}
+
+.weekly-average-number {
+  font-size: 2.4rem;
+  font-weight: bold;
+  color: #f0e0a0;
+  line-height: 1;
+}
+
+.weekly-average-label {
+  font-size: 0.8rem;
+  color: #a08060;
+  text-align: center;
+}
+
+.weekly-trend {
+  font-size: 1.2rem;
+  color: #a08060;
+}
+
+.weekly-trend-up { color: #6dbf6d; }
+.weekly-trend-down { color: #bf6d6d; }
+
+.weekly-read-reviews-btn {
+  background: none !important;
+  border: 1px solid #8b6331 !important;
+  color: #c8a96e !important;
+  font-size: 0.85rem !important;
+  padding: 6px 16px !important;
+  min-width: unset !important;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.weekly-overall-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #a08060;
+}
+
+.weekly-overall-value {
+  color: #f0e0a0;
+  font-weight: bold;
+}
+
+.weekly-report-intro {
+  background: #2a1a08;
+  border: 1px solid #8b6331;
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.weekly-report-intro p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #e8d8b0;
+}
+
+.weekly-report-intro-headline {
+  font-size: 1rem !important;
+  font-weight: bold;
+  color: #f0e0a0 !important;
+}
+
+.weekly-featured-reviews {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.review-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.review-page-btn {
+  background: none !important;
+  border: none !important;
+  color: #c8a96e;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0 4px !important;
+  min-width: unset !important;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.review-page-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.review-page-indicator {
+  font-size: 0.85rem;
+  color: #a08060;
+}
+
 /* MBW-61: Yelp-style customer review card */
 .review-card {
   width: 320px;

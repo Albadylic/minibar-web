@@ -1,13 +1,36 @@
 // MBW-NEW: Weekly Report screen — shown after every 7th day.
 // Displays review breakdown, featured reviews, and the updated rolling star rating.
 // Week 1 shows a tutorial intro instead of review data (no reviews during Week 1).
+import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 
-function StarBar({ count, total }: { count: number; total: number }) {
-  const pct = total > 0 ? (count / total) * 100 : 0
+function ReviewCard({ r, showPagination, page, total, onPrev, onNext }: {
+  r: { customerName?: string | null; isRegular: boolean; stars: number; text?: string | null; day: number }
+  showPagination: boolean
+  page: number
+  total: number
+  onPrev: () => void
+  onNext: () => void
+}) {
   return (
-    <div className="star-bar">
-      <div className="star-bar-fill" style={{ width: `${pct}%` }} />
+    <div className="weekly-featured-reviews">
+      <div className={`review-card ${r.isRegular ? 'review-card-regular' : ''}`}>
+        <div className="review-header">
+          <span className="review-name">{r.customerName ?? 'Anonymous'}</span>
+          <span className="review-stars">
+            {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
+          </span>
+        </div>
+        {r.text && <p className="review-text">"{r.text}"</p>}
+        <p className="review-meta">Day {r.day}</p>
+      </div>
+      {showPagination && (
+        <div className="review-pagination">
+          <button className="review-page-btn" disabled={page === 0} onClick={onPrev}>‹</button>
+          <span className="review-page-indicator">{page + 1} / {total}</span>
+          <button className="review-page-btn" disabled={page === total - 1} onClick={onNext}>›</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -15,14 +38,12 @@ function StarBar({ count, total }: { count: number; total: number }) {
 export function WeeklyReportScreen() {
   const { gameSave, endWeek, goToScreen, pendingEvent } = useGameStore()
 
-  // completedDay = dayNumber - 1 (day that just ended before shop)
   const completedDay = gameSave.dayNumber - 1
   const completedWeek = Math.ceil(completedDay / 7)
   const isWeek1End = completedWeek === 1
 
   const reviews = gameSave.currentWeekReviews
 
-  // Compute weekly stats from current week's reviews
   const totalReviews = reviews.length
   const weeklyAverage =
     totalReviews > 0
@@ -34,21 +55,22 @@ export function WeeklyReportScreen() {
     if (r.stars >= 1 && r.stars <= 5) starCounts[r.stars - 1]!++
   }
 
-  // Featured reviews: all regulars + up to 2 named NPCs, sorted by extremity
+  // Featured reviews: regulars first, then most extreme anonymous reviews
   const regularReviews = reviews.filter((r) => r.isRegular)
-  const namedNpcReviews = reviews
+  const extremeReviews = reviews
     .filter((r) => !r.isRegular && r.customerName)
-    .sort((a, b) => Math.abs(a.stars - 3) > Math.abs(b.stars - 3) ? -1 : 1)
+    .sort((a, b) => Math.abs(b.stars - 3) - Math.abs(a.stars - 3))
     .slice(0, 2)
-  const featuredReviews = [...regularReviews, ...namedNpcReviews]
+  const allReviews = [...regularReviews, ...extremeReviews]
 
-  // Previous week's average for trend arrow
+  // Spotlight: one review shown by default — first regular, or most extreme anon
+  const spotlightReview = allReviews[0] ?? null
+
+  const [showAll, setShowAll] = useState(false)
+  const [reviewPage, setReviewPage] = useState(0)
+
   const prevHistory = gameSave.weeklyHistory
   const lastWeekAvg = prevHistory.length > 0 ? prevHistory[prevHistory.length - 1]!.averageRating : null
-
-  // Show this week's average as the projected rating; endWeek() computes the true rolling average
-  const projectedRating = weeklyAverage
-
   const trendUp = lastWeekAvg !== null && weeklyAverage > lastWeekAvg
   const trendDown = lastWeekAvg !== null && weeklyAverage < lastWeekAvg
 
@@ -61,7 +83,6 @@ export function WeeklyReportScreen() {
     }
   }
 
-  // MBW-NEW: Week 1 end — show tutorial intro to ratings system
   if (isWeek1End) {
     return (
       <div className="screen weekly-report-screen">
@@ -93,67 +114,73 @@ export function WeeklyReportScreen() {
     <div className="screen weekly-report-screen">
       <h2>Week {completedWeek} Report</h2>
 
-      {/* This week's average */}
-      <div className="weekly-rating-headline">
-        <span className="weekly-rating-stars">
-          {'★'.repeat(Math.round(weeklyAverage))}{'☆'.repeat(5 - Math.round(weeklyAverage))}
-        </span>
-        <span className="weekly-rating-number">
-          {totalReviews > 0 ? weeklyAverage.toFixed(1) : '—'}
-        </span>
-        <span className="weekly-rating-label">This week</span>
-      </div>
-
-      {/* Star breakdown */}
-      {totalReviews > 0 && (
-        <div className="star-breakdown">
-          {([5, 4, 3, 2, 1] as const).map((s) => (
-            <div key={s} className="star-breakdown-row">
-              <span className="star-breakdown-label">{'★'.repeat(s)}</span>
-              <StarBar count={starCounts[s - 1]!} total={totalReviews} />
-              <span className="star-breakdown-count">{starCounts[s - 1]}</span>
-            </div>
-          ))}
-          <p className="star-breakdown-total">{totalReviews} review{totalReviews !== 1 ? 's' : ''} this week</p>
+      {/* Stats row: breakdown column + average */}
+      {totalReviews > 0 ? (
+        <div className="weekly-stats-row">
+          <div className="star-breakdown">
+            {([5, 4, 3, 2, 1] as const).map((s) => (
+              <div key={s} className="star-breakdown-row">
+                <span className="star-breakdown-label">{s}★</span>
+                <span className="star-breakdown-count">{starCounts[s - 1]}</span>
+              </div>
+            ))}
+            <p className="star-breakdown-total">{totalReviews} review{totalReviews !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="weekly-average-block">
+            <span className="weekly-average-number">{weeklyAverage.toFixed(1)}</span>
+            <span className="weekly-average-label">avg this week</span>
+            {trendUp && <span className="weekly-trend weekly-trend-up">↑</span>}
+            {trendDown && <span className="weekly-trend weekly-trend-down">↓</span>}
+            {!trendUp && !trendDown && lastWeekAvg !== null && <span className="weekly-trend">→</span>}
+          </div>
         </div>
-      )}
-
-      {totalReviews === 0 && (
+      ) : (
         <p className="weekly-no-reviews">No reviews this week.</p>
       )}
 
-      {/* Featured review cards */}
-      {featuredReviews.length > 0 && (
-        <div className="weekly-featured-reviews">
-          {featuredReviews.map((r) => (
-            <div
-              key={r.id}
-              className={`review-card ${r.isRegular ? 'review-card-regular' : ''}`}
-            >
-              <div className="review-header">
-                <span className="review-name">{r.customerName ?? 'Anonymous'}</span>
-                <span className="review-stars">
-                  {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
-                </span>
-              </div>
-              {r.text && <p className="review-text">"{r.text}"</p>}
-              <p className="review-meta">Day {r.day}</p>
-            </div>
-          ))}
-        </div>
+      {/* Spotlight review */}
+      {!showAll && spotlightReview && (
+        <ReviewCard
+          r={spotlightReview}
+          showPagination={false}
+          page={0}
+          total={1}
+          onPrev={() => {}}
+          onNext={() => {}}
+        />
       )}
 
-      {/* Overall rating with trend */}
+      {/* All reviews — paginated */}
+      {showAll && allReviews.length > 0 && (() => {
+        const r = allReviews[reviewPage]!
+        return (
+          <ReviewCard
+            r={r}
+            showPagination={allReviews.length > 1}
+            page={reviewPage}
+            total={allReviews.length}
+            onPrev={() => setReviewPage((p) => p - 1)}
+            onNext={() => setReviewPage((p) => p + 1)}
+          />
+        )
+      })()}
+
+      {/* Read reviews toggle */}
+      {allReviews.length > 0 && (
+        <button
+          className="weekly-read-reviews-btn"
+          onClick={() => { setShowAll((v) => !v); setReviewPage(0) }}
+        >
+          {showAll ? 'Hide reviews' : `Read reviews (${allReviews.length})`}
+        </button>
+      )}
+
+      {/* Overall rating */}
       <div className="weekly-overall-rating">
         <span className="weekly-overall-label">Overall rating</span>
         <span className="weekly-overall-value">
-          ★ {projectedRating > 0 ? projectedRating.toFixed(1) : '—'}
+          ★ {weeklyAverage > 0 ? weeklyAverage.toFixed(1) : '—'}
         </span>
-        {trendUp && <span className="weekly-trend weekly-trend-up">↑</span>}
-        {trendDown && <span className="weekly-trend weekly-trend-down">↓</span>}
-        {!trendUp && !trendDown && lastWeekAvg !== null && (
-          <span className="weekly-trend">→</span>
-        )}
       </div>
 
       <button className="weekly-report-cta" onClick={handleStartNextWeek}>

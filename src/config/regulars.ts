@@ -17,28 +17,28 @@ export const REGULARS: RegularConfig[] = [
     displayName: 'Bjorn the Blacksmith',
     skin: 'blacksmith',
     letterMarker: 'B',
-    visitChancePerDay: 0.3,
+    visitChancePerDay: 0.08,
   },
   {
     id: 'greta_farmer',
     displayName: 'Greta the Farmer',
     skin: 'farmer',
     letterMarker: 'G',
-    visitChancePerDay: 0.3,
+    visitChancePerDay: 0.08,
   },
   {
     id: 'aldric_priest',
     displayName: 'Father Aldric',
     skin: 'priest',
     letterMarker: 'A',
-    visitChancePerDay: 0.25,
+    visitChancePerDay: 0.06,
   },
   {
     id: 'oswin_merchant',
     displayName: 'Oswin the Merchant',
     skin: 'merchant',
     letterMarker: 'O',
-    visitChancePerDay: 0.25,
+    visitChancePerDay: 0.06,
   },
 ]
 
