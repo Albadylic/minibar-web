@@ -102,7 +102,6 @@ class CustomerSystem {
 
     // Reset timer with slight randomisation to avoid perfect metering
     this.timeSinceLastSpawn = -(Math.random() * interval * 0.25)
-<<<<<<< new-reviews
 
     // MBW-NEW: Regulars only appear from Week 2 onward (dayNumber > 7), max one per day
     const { gameSave } = useGameStore.getState()
@@ -124,9 +123,6 @@ class CustomerSystem {
       }
     }
 
-    let customerType = this.rollCustomerType(dayConfig.customerWeights, phase)
-=======
->>>>>>> main
     // MBW-181: Doorman tier 2 — chance to turn away a hooligan at the door
     if (customerType === 'HOOLIGAN' && dayConfig.modifiers.hooliganFilterChance > 0 && Math.random() < dayConfig.modifiers.hooliganFilterChance) {
       customerType = 'NORMAL'
