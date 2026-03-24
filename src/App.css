@@ -213,8 +213,10 @@
 
 /* Weekly report */
 .weekly-report-screen {
-  justify-content: center;
+  justify-content: flex-start;
   gap: 16px;
+  overflow-y: auto;
+  padding: 20px 0 24px;
 }
 
 .weekly-stats-row {

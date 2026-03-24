@@ -138,42 +138,29 @@ export function WeeklyReportScreen() {
         <p className="weekly-no-reviews">No reviews this week.</p>
       )}
 
-      {/* Spotlight review */}
-      {!showAll && spotlightReview && (
-        <ReviewCard
-          r={spotlightReview}
-          showPagination={false}
-          page={0}
-          total={1}
-          onPrev={() => {}}
-          onNext={() => {}}
-        />
-      )}
-
-      {/* All reviews — paginated */}
-      {showAll && allReviews.length > 0 && (() => {
-        const r = allReviews[reviewPage]!
+      {/* Review slot: spotlight by default, full paginated list when expanded */}
+      {allReviews.length > 0 && (() => {
+        const displayReviews = showAll ? allReviews : [spotlightReview!]
+        const r = displayReviews[reviewPage]!
         return (
-          <ReviewCard
-            r={r}
-            showPagination={allReviews.length > 1}
-            page={reviewPage}
-            total={allReviews.length}
-            onPrev={() => setReviewPage((p) => p - 1)}
-            onNext={() => setReviewPage((p) => p + 1)}
-          />
+          <>
+            <ReviewCard
+              r={r}
+              showPagination={showAll && allReviews.length > 1}
+              page={reviewPage}
+              total={allReviews.length}
+              onPrev={() => setReviewPage((p) => p - 1)}
+              onNext={() => setReviewPage((p) => p + 1)}
+            />
+            <button
+              className="weekly-read-reviews-btn"
+              onClick={() => { setShowAll((v) => !v); setReviewPage(0) }}
+            >
+              {showAll ? '← Back' : `Read all reviews (${allReviews.length})`}
+            </button>
+          </>
         )
       })()}
-
-      {/* Read reviews toggle */}
-      {allReviews.length > 0 && (
-        <button
-          className="weekly-read-reviews-btn"
-          onClick={() => { setShowAll((v) => !v); setReviewPage(0) }}
-        >
-          {showAll ? 'Hide reviews' : `Read reviews (${allReviews.length})`}
-        </button>
-      )}
 
       {/* Overall rating */}
       <div className="weekly-overall-rating">
