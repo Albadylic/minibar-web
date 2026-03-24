@@ -43,7 +43,7 @@ npm run preview  # verify the build locally before deploying
 
 ```
 src/
-  screens/        # React screens: MainMenu, Day, Shop, GameOver, EventNotice
+  screens/        # React screens: MainMenu, Day, Shop, GameOver, EventNotice, WeeklyReport
   engine/
     systems/      # All game logic systems (see below)
     events/       # Typed event dispatcher
@@ -57,13 +57,15 @@ public/           # PWA icons, apple-touch-icon
 
 ### App state machine
 
-Five screens managed via Zustand `screen` state in `gameStore.ts`:
+Six screens managed via Zustand `screen` state in `gameStore.ts`:
 
 ```
 MAIN_MENU → DAY_IN_PROGRESS → BETWEEN_DAY_SHOP → DAY_IN_PROGRESS → ...
                                       ↓ (event announced)
                                EVENT_NOTICE → DAY_IN_PROGRESS
-                                      ↓ (star rating ≤ 1.0)
+                                      ↓ (every 7th day)
+                               WEEKLY_REPORT → DAY_IN_PROGRESS
+                                      ↓ (coins run out / cannot continue)
                                   GAME_OVER
 ```
 
@@ -77,11 +79,11 @@ MAIN_MENU → DAY_IN_PROGRESS → BETWEEN_DAY_SHOP → DAY_IN_PROGRESS → ...
 
 | System | Responsibility |
 |---|---|
-| `customerSystem` | Spawning, pathfinding, patience decay, phase-weighted arrival |
-| `drinkServingSystem` | Tap selection, serve validation, coin/rating updates |
-| `reviewSystem` | End-of-day review selection based on day performance |
-| `brawlSystem` | Hooligan brawl initiation, collateral damage, resolution |
-| `cleaningSystem` | Glass mess spawning, cleaner NPC pathfinding, tap-to-clean |
+| `customerSystem` | Spawning, pathfinding, patience decay, phase-weighted arrival, regular customer logic |
+| `drinkServingSystem` | Tap selection, serve validation, coin updates, review generation on serve |
+| `reviewSystem` | Review record generation, weekly average computation, rolling rating |
+| `brawlSystem` | Hooligan brawl initiation, roaming, collateral damage, resolution |
+| `cleaningSystem` | Glass mess spawning, graduated seat-blocking, cleaner NPC pathfinding |
 | `entertainerSystem` | Performer arrival, tip prompts, patience/coin effects |
 | `kingsTraySystem` | Special drink order for Noble's Visit event |
 | `securitySystem` | Bouncer NPC — auto-ejects brawlers |
@@ -101,6 +103,9 @@ All balance values live in `src/config/` — never hardcoded inside systems:
 | `difficulty.ts` | Per-day difficulty scaling |
 | `entertainers.ts` | Entertainer stats, tip tiers, XP thresholds |
 | `reviews.ts` | End-of-day review strings and tag rules |
+| `reviewConfig.ts` | Review probability constants and rating gate thresholds |
+| `reviewTemplates.ts` | Named review message banks by trigger type |
+| `regulars.ts` | Named regular customer configs (visit chance, skin, letter marker) |
 | `tutorials.ts` | Tutorial popup triggers and copy |
 
 Code comments reference ticket IDs: `// MBW-47: description`.
@@ -110,19 +115,51 @@ Code comments reference ticket IDs: `// MBW-47: description`.
 ## Gameplay
 
 - **Serve drinks:** click a tap to select a drink, then click a customer to serve it.
-- **Correct serves** earn coins; wrong drinks or expired patience cost star rating.
+- **Correct serves** earn coins; wrong drinks or expired patience generate negative reviews.
 - **A day lasts 120 seconds** across four phases: Morning (0–30s) · Afternoon (30–60s) · Evening (60–90s) · Night (90–120s). Last Orders fires at 100s.
 - **Between days:** spend coins in the shop on upgrades, then the next day begins.
-- **Game over** if star rating drops to or below 1.0.
+- **Every 7 days** a Weekly Report screen shows your review breakdown and updates your displayed star rating.
+
+### Rating system
+
+Reviews accumulate silently during play. At the end of each week the displayed rating updates using a weighted rolling average:
+
+```
+displayedRating = thisWeek×0.40 + lastWeek×0.30 + twoWeeksAgo×0.20 + threeWeeksAgo×0.10
+```
+
+A higher rating brings more customers and a wealthier crowd — but also higher expectations and harsher review thresholds. There is no game over from ratings alone.
+
+**Review triggers:**
+
+| Event | Chance | Polarity |
+|---|---|---|
+| Brawl victim | 100% | Negative |
+| Unserved (patience expired) | 80% | Negative |
+| Wrong drink | 60% | Negative |
+| Fast service | 15% | Positive |
+| Normal serve | 10% | Positive |
+| Slow serve (>50% patience left) | 5% | Positive |
+
+Week 1 is a grace period — negative review probability is halved.
 
 ### Customer types
 
 | Type | Behaviour |
 |---|---|
 | Normal | Standard patience and reward |
-| Rich Clientele | High coin reward; harsher star penalty for mistakes |
+| Rich Clientele | High coin reward; higher expectations (lower mess tolerance, harsher reviews) |
 | The Drunk | Blocks a seat without ordering — must be escorted out |
-| Hooligans | Spawn on Game Days; may trigger brawls that damage nearby customers |
+| Hooligans | Spawn on Game Days; may trigger brawls; hitting another hooligan starts a second brawl |
+| Regulars | Named customers (Bjorn, Greta, Father Aldric, Oswin); appear from Week 2; always leave a review; shown as green sprites |
+
+### Mess & capacity
+
+Customers leave glasses behind when they depart. Glasses accumulate on the bar counter (stools) and table surfaces. A messy seat deters new customers:
+
+- **Bar stool:** 1 glass deters rich clientele; 2 glasses deters anyone
+- **Table:** 2 glasses deters rich clientele; 4 glasses deters anyone
+- Below the threshold a probabilistic check applies — partially messy seats still occasionally fill
 
 ### Events
 
