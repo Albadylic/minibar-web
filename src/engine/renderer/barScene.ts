@@ -41,6 +41,7 @@ const COLORS = {
 interface TapSprite {
   container: Container
   circle: Graphics
+  fillBar: Graphics
   drinkId: string
 }
 
@@ -192,12 +193,17 @@ class BarScene {
       label.position.set(0, 15)
       container.addChild(label)
 
+      // MBW-NEW: Supply fill bar — shows remaining stock level
+      const fillBar = new Graphics()
+      fillBar.position.set(0, 27)
+      container.addChild(fillBar)
+
       container.on('pointerdown', () => {
         eventDispatcher.emit('DRINK_CLICKED', { drinkId })
       })
 
       this.root!.addChild(container)
-      this.tapSprites.set(drinkId, { container, circle, drinkId })
+      this.tapSprites.set(drinkId, { container, circle, fillBar, drinkId })
     })
   }
 
@@ -280,6 +286,32 @@ class BarScene {
       g.addChild(label)
 
       this.root.addChild(g)
+    }
+  }
+
+  // MBW-NEW: Update tap fill bar to reflect remaining supply (pct 0–1)
+  updateTapFill(drinkId: string, pct: number): void {
+    const tap = this.tapSprites.get(drinkId)
+    if (!tap) return
+    const clampedPct = Math.max(0, Math.min(1, pct))
+    tap.fillBar.clear()
+    // Background track
+    tap.fillBar.rect(-10, 0, 20, 3).fill({ color: 0x333333 })
+    if (clampedPct > 0) {
+      const fillColor = clampedPct > 0.5 ? 0x44cc44 : clampedPct > 0.25 ? 0xddcc00 : 0xcc2222
+      tap.fillBar.rect(-10, 0, Math.round(20 * clampedPct), 3).fill({ color: fillColor })
+    }
+  }
+
+  // MBW-NEW: Grey out (or restore) a tap when supply runs out (or is restocked)
+  setTapAvailable(drinkId: string, available: boolean): void {
+    const tap = this.tapSprites.get(drinkId)
+    if (!tap) return
+    tap.container.alpha = available ? 1.0 : 0.35
+    tap.container.eventMode = available ? 'static' : 'none'
+    // Deselect if the tap becoming unavailable was selected
+    if (!available && this.selectedDrinkId === drinkId) {
+      this.setSelectedDrink(null)
     }
   }
 

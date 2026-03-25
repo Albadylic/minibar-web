@@ -10,6 +10,8 @@ import { DRINKS_BY_ID } from '../../config/drinks'
 import type { DrinkConfig } from '../../config/drinks'
 import { entertainerSystem } from './entertainerSystem'
 import type { CustomerEntity } from '../../entities/customer'
+import { useGameStore } from '../../store/gameStore'
+import { FINANCES_CONFIG } from '../../config/finances'
 
 class DrinkServingSystem {
   // MBW-26: Toggle drink selection on tap click
@@ -68,6 +70,18 @@ class DrinkServingSystem {
     gameLoop.addCoins(coins)
     gameLoop.recordCustomerServed()
     customerSystem.serveCustomer(customer.id)
+
+    // MBW-NEW: Track supply consumption and weekly revenue
+    const store = useGameStore.getState()
+    const remaining = store.consumeSupply(drink.id)
+    store.addWeeklyRevenue(coins)
+    if (remaining === 0) {
+      barScene.setTapAvailable(drink.id, false)
+      eventDispatcher.emit('SUPPLY_DEPLETED', { drinkId: drink.id })
+    } else {
+      barScene.updateTapFill(drink.id, remaining / FINANCES_CONFIG.DEFAULT_SUPPLY_CAPACITY)
+    }
+
     eventDispatcher.emit('DRINK_SERVED', {
       customerId: customer.id,
       drinkId: drink.id,

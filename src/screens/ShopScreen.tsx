@@ -8,10 +8,10 @@
 import { useGameStore } from '../store/gameStore'
 import { useDayResultStore } from '../store/dayResultStore'
 import { useHudStore } from '../store/hudStore'
-import { UPGRADES, type UpgradeConfig } from '../config/upgrades'
+import { UPGRADES, UPGRADES_BY_ID, type UpgradeConfig } from '../config/upgrades'
+import { FINANCES_CONFIG } from '../config/finances'
 import { rollNextDayEvent } from '../config/events'
-import { PRE_DAY_POWERUPS, POWERUP_CONFIGS } from '../config/powerups'
-import type { PowerupType } from '../types/achievements'
+import { POWERUP_CONFIGS } from '../config/powerups'
 import { getPendingTutorials } from '../config/tutorials'
 import {
   ENTERTAINER_CONFIGS,
@@ -71,7 +71,7 @@ function pickStaffUpgrades(upgrades: UpgradeConfig[]): UpgradeConfig[] {
 type ShopTab = 'upgrades' | 'staff'
 
 export function ShopScreen() {
-  const { goToScreen, gameSave, purchaseUpgrade, updateSave, setPendingEvent, purchasePowerup } = useGameStore()
+  const { goToScreen, gameSave, purchaseUpgrade, updateSave, setPendingEvent, purchasePowerup, sellUpgrade, downgradeUpgrade, fireStaff, checkBurglary, burglaryNotification, clearBurglaryNotification, burglaryCheckedForDay } = useGameStore()
   const completedDay = gameSave.dayNumber - 1
   const upcomingDay = gameSave.dayNumber
   const lastResult = useDayResultStore((s) => s.lastResult)
@@ -111,8 +111,17 @@ export function ShopScreen() {
     }, 1000)
   }
 
+  // MBW-NEW: Run burglary check once per day on shop mount
+  const completedDayForBurglary = gameSave.dayNumber - 1
+  if (burglaryCheckedForDay < completedDayForBurglary) {
+    checkBurglary()
+  }
+
   const [tipEmoji, setTipEmoji] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ShopTab>('upgrades')
+  const [confirmAction, setConfirmAction] = useState<{
+    label: string; coins: number; onConfirm: () => void
+  } | null>(null)
   const achievementSummary = useHudStore((s) => s.pendingAchievementSummary)
   const [purchasedToday, setPurchasedToday] = useState<Set<string>>(new Set())
 
@@ -178,6 +187,105 @@ export function ShopScreen() {
     )
   }
 
+  // MBW-NEW: Sell/downgrade panel for each owned non-staff upgrade
+  function renderOwnedUpgradeManage(upgradeId: string) {
+    const owned = gameSave.upgrades[upgradeId]
+    if (!owned) return null
+    const config = UPGRADES_BY_ID[upgradeId]
+    if (!config || config.category === 'staff') return null
+
+    const tier1Cost = config.tiers[0]?.cost ?? 0
+    const sellRefund = Math.floor(tier1Cost * FINANCES_CONFIG.SELL_REFUND_RATE)
+    const canDowngrade = owned.tier >= 2
+    const downgradeTierCost = canDowngrade ? (config.tiers[owned.tier - 1]?.cost ?? 0) : 0
+    const downgradeRefund = Math.floor(downgradeTierCost * FINANCES_CONFIG.SELL_REFUND_RATE)
+
+    return (
+      <div key={upgradeId} className="upgrade-manage-row">
+        <span className="upgrade-manage-name">{config.name} (T{owned.tier})</span>
+        <div className="upgrade-manage-btns">
+          {canDowngrade && (
+            <button
+              className="shop-downgrade-btn"
+              onClick={() =>
+                setConfirmAction({
+                  label: `Downgrade ${config.name} to T${owned.tier - 1}?`,
+                  coins: downgradeRefund,
+                  onConfirm: () => { downgradeUpgrade(upgradeId); setConfirmAction(null) },
+                })
+              }
+            >
+              Downgrade +🪙{downgradeRefund}
+            </button>
+          )}
+          <button
+            className="shop-sell-btn"
+            onClick={() =>
+              setConfirmAction({
+                label: `Sell ${config.name}?`,
+                coins: sellRefund,
+                onConfirm: () => { sellUpgrade(upgradeId); setConfirmAction(null) },
+              })
+            }
+          >
+            Sell +🪙{sellRefund}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // MBW-NEW: Staff card with Fire button
+  function renderStaffCard(upgrade: UpgradeConfig) {
+    const owned = gameSave.upgrades[upgrade.id]
+    const currentTier = owned?.tier ?? 0
+    const isMaxed = currentTier >= upgrade.maxTier
+    const tierConfig = upgrade.tiers[currentTier]
+    const boughtToday = purchasedToday.has(upgrade.id)
+    const canAfford = tierConfig ? gameSave.coins >= tierConfig.cost : false
+    const isHired = currentTier > 0
+
+    return (
+      <div key={upgrade.id} className={`upgrade-card ${isMaxed ? 'upgrade-maxed' : ''}`}>
+        <div className="upgrade-name">
+          <span>{upgrade.name}</span>
+          {upgrade.maxTier > 1 && (
+            <span className="upgrade-tier">{isMaxed ? `★ Maxed` : currentTier > 0 ? `Level ${currentTier}` : 'Not hired'}</span>
+          )}
+        </div>
+        {isHired && (
+          <button
+            className="shop-fire-btn"
+            onClick={() =>
+              setConfirmAction({
+                label: `Fire ${upgrade.name}?`,
+                coins: 0,
+                onConfirm: () => { fireStaff(upgrade.id); setConfirmAction(null) },
+              })
+            }
+          >
+            Fire
+          </button>
+        )}
+        {isMaxed ? (
+          <div className="upgrade-owned">✓ Maxed</div>
+        ) : tierConfig ? (
+          <div className="upgrade-card-body">
+            <div className="upgrade-desc">{tierConfig.description}</div>
+            <button
+              className="upgrade-buy"
+              disabled={!canAfford || boughtToday}
+              onClick={() => handlePurchase(upgrade.id)}
+              title={boughtToday ? 'One purchase per upgrade per day' : undefined}
+            >
+              🪙 {tierConfig.cost}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   // MBW-NEW: Route to WeeklyReport at end of every 7th completed day
   const isEndOfWeek = completedDay > 0 && completedDay % 7 === 0
 
@@ -190,15 +298,10 @@ export function ShopScreen() {
       updateSave({ daysSinceLastGameDay: gameSave.daysSinceLastGameDay + 1 })
     }
 
-    const hasPredayPowerups = (PRE_DAY_POWERUPS as PowerupType[]).some(
-      (t) => gameSave.powerups.unlockedTypes.includes(t) && (gameSave.powerups.inventory[t] ?? 0) > 0,
-    )
     if (isEndOfWeek) {
       goToScreen('WEEKLY_REPORT')
-    } else if (event || hasPredayPowerups) {
-      goToScreen('EVENT_NOTICE')
     } else {
-      goToScreen('DAY_IN_PROGRESS')
+      goToScreen('RESTOCK')
     }
   }
 
@@ -236,8 +339,40 @@ export function ShopScreen() {
         </div>
       )}
 
+      {/* MBW-NEW: Burglary notification — shown before shop is usable */}
+      {!tipPrompt && burglaryNotification && (
+        <div className="burglary-overlay">
+          <div className="burglary-card">
+            <h3>Overnight Burglary!</h3>
+            <p>
+              Your bar was broken into. <strong>{burglaryNotification.upgradeName}</strong> was damaged.
+            </p>
+            {burglaryNotification.covered ? (
+              <p className="burglary-insured">Your insurance covered the loss — coins refunded.</p>
+            ) : (
+              <p className="burglary-uninsured">You had no insurance. No refund.</p>
+            )}
+            <button onClick={clearBurglaryNotification}>OK</button>
+          </div>
+        </div>
+      )}
+
+      {/* MBW-NEW: Confirm sell/downgrade/fire overlay */}
+      {!tipPrompt && !burglaryNotification && confirmAction && (
+        <div className="confirm-overlay">
+          <div className="confirm-card">
+            <p>{confirmAction.label}</p>
+            {confirmAction.coins > 0 && <p className="confirm-refund">You will receive 🪙{confirmAction.coins}</p>}
+            <div className="confirm-actions">
+              <button onClick={confirmAction.onConfirm}>Confirm</button>
+              <button onClick={() => setConfirmAction(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MBW-NEW: Achievement summary overlay — shown after earning achievements in-day */}
-      {!tipPrompt && achievementSummary && achievementSummary.length > 0 && (
+      {!tipPrompt && !burglaryNotification && !confirmAction && achievementSummary && achievementSummary.length > 0 && (
         <div className="achievement-summary-overlay">
           <div className="achievement-summary-card">
             <h3>Achievements Earned!</h3>
@@ -257,7 +392,7 @@ export function ShopScreen() {
       )}
 
       {/* MBW-173: Tutorial overlay — shown one at a time before the shop is usable */}
-      {!tipPrompt && !achievementSummary?.length && activeTutorial && (
+      {!tipPrompt && !burglaryNotification && !confirmAction && !achievementSummary?.length && activeTutorial && (
         <div className="tutorial-overlay">
           <div className="tutorial-card">
             <h3 className="tutorial-title">{activeTutorial.title}</h3>
@@ -316,12 +451,22 @@ export function ShopScreen() {
       {activeTab === 'upgrades' && (
         <div className="shop-upgrades">
           {shopUpgrades.map(renderUpgradeCard)}
+          {/* MBW-NEW: Manage owned upgrades — sell or downgrade */}
+          {Object.keys(gameSave.upgrades).some((id) => {
+            const cfg = UPGRADES_BY_ID[id]
+            return cfg && cfg.category !== 'staff'
+          }) && (
+            <div className="shop-manage-section">
+              <p className="shop-manage-title">Manage Owned</p>
+              {Object.keys(gameSave.upgrades).map(renderOwnedUpgradeManage)}
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'staff' && (
         <div className="shop-staff">
-          {staffUpgrades.map(renderUpgradeCard)}
+          {staffUpgrades.map(renderStaffCard)}
         </div>
       )}
 

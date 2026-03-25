@@ -7,6 +7,7 @@ export interface DrinkConfig {
   tier: 1 | 2 | 3
   unlockDay: number // day number when this drink becomes available
   coinReward: number
+  supplyUnitCost: number // MBW-NEW: cost per unit when restocking (before bulk discount)
   placeholderColor: number // hex color for placeholder circle
   customerAffinities: {
     normal: number       // weight for NORMAL customers
@@ -22,6 +23,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 1,
     unlockDay: 1,
     coinReward: 5,
+    supplyUnitCost: 1,
     placeholderColor: 0xf5c842,
     customerAffinities: { normal: 1.0, hooligan: 1.5 },
   },
@@ -31,6 +33,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 1,
     unlockDay: 1,
     coinReward: 5,
+    supplyUnitCost: 1,
     placeholderColor: 0xc47a2b,
     customerAffinities: { normal: 1.0, hooligan: 1.2 },
   },
@@ -40,6 +43,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 2,
     unlockDay: 4,
     coinReward: 8,
+    supplyUnitCost: 2,
     placeholderColor: 0x3b1e08,
     customerAffinities: { normal: 0.8, hooligan: 1.1 },
   },
@@ -49,6 +53,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 2,
     unlockDay: 7,
     coinReward: 8,
+    supplyUnitCost: 2,
     placeholderColor: 0xa8d44e,
     customerAffinities: { normal: 0.8 },
   },
@@ -58,6 +63,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 2,
     unlockDay: 10,
     coinReward: 8,
+    supplyUnitCost: 3,
     placeholderColor: 0xff7b00, // bright orange — clearly distinct from Ale's brown
     customerAffinities: { normal: 0.7 },
   },
@@ -67,6 +73,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 2,
     unlockDay: 13,
     coinReward: 8,
+    supplyUnitCost: 4,
     placeholderColor: 0x8b1a3a,
     customerAffinities: { normal: 0.6, rich: 1.0 },
   },
@@ -77,6 +84,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 3,
     unlockDay: 15,
     coinReward: 12,
+    supplyUnitCost: 5,
     placeholderColor: 0xd4902a,
     customerAffinities: { normal: 0.5, hooligan: 1.4, rich: 0.8 },
   },
@@ -86,6 +94,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 3,
     unlockDay: 18,
     coinReward: 12,
+    supplyUnitCost: 6,
     placeholderColor: 0x8b3a0a,
     customerAffinities: { normal: 0.4, rich: 1.2 },
   },
@@ -95,6 +104,7 @@ export const DRINKS: DrinkConfig[] = [
     tier: 3,
     unlockDay: 21,
     coinReward: 15,
+    supplyUnitCost: 8,
     placeholderColor: 0xf0e68c,
     customerAffinities: { normal: 0.3, rich: 1.5 },
   },

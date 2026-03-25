@@ -1017,3 +1017,382 @@
   text-align: center;
   line-height: 1.4;
 }
+
+/* ======================================================
+   MBW-NEW: Bar Finances — Restock Screen
+   ====================================================== */
+.restock-screen {
+  justify-content: flex-start;
+  padding: 16px 12px 12px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.restock-subtitle {
+  font-size: 0.85rem;
+  color: #c8a86a;
+  margin: 0;
+}
+
+.restock-drink-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.restock-drink-row {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid #5c3d11;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.restock-drink-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.restock-drink-name {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.restock-drink-stock {
+  font-size: 0.78rem;
+  color: #a88850;
+}
+
+.restock-used {
+  color: #cc8844;
+}
+
+.restock-cart-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #88cc88;
+  margin-bottom: 6px;
+}
+
+.restock-clear-btn {
+  background: none !important;
+  border: none !important;
+  color: #cc4444 !important;
+  cursor: pointer !important;
+  padding: 0 4px !important;
+  min-width: unset !important;
+  font-size: 0.85rem;
+}
+
+.restock-bulk-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.restock-bulk-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 4px !important;
+  min-width: unset !important;
+  background: #3a2408 !important;
+  border: 1px solid #8b6331 !important;
+  font-size: 0.75rem;
+  gap: 1px;
+}
+
+.restock-bulk-btn:hover {
+  background: #5a3a10 !important;
+}
+
+.bulk-qty { font-weight: bold; }
+.bulk-cost { color: #f5e6c8; }
+.bulk-discount { color: #88cc44; font-size: 0.65rem; }
+
+.restock-footer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.restock-totals {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+
+.restock-balance-ok { color: #88cc44; }
+.restock-balance-short { color: #cc4444; }
+
+.restock-bill-warning {
+  font-size: 0.8rem;
+  color: #ddaa22;
+  text-align: center;
+  margin: 0;
+}
+
+.restock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.restock-open-btn { width: 100%; }
+.restock-skip-btn {
+  width: 100%;
+  background: transparent !important;
+  border-color: #5c3d11 !important;
+  color: #a88850 !important;
+  font-size: 0.85rem;
+}
+
+/* ======================================================
+   MBW-NEW: Bar Finances — Weekly Bill Screen
+   ====================================================== */
+.weekly-bill-screen {
+  justify-content: flex-start;
+  padding: 16px 14px 12px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.bill-section {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid #5c3d11;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.bill-section-title {
+  font-size: 0.8rem;
+  color: #a88850;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px;
+}
+
+.bill-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 2px 0;
+}
+
+.bill-section-total {
+  border-top: 1px solid #5c3d11;
+  margin-top: 4px;
+  padding-top: 4px;
+  font-weight: bold;
+}
+
+.bill-positive { color: #88cc44; }
+
+.bill-loan-line { color: #ddaa22; }
+
+.bill-supplies-info { opacity: 0.6; }
+.bill-info { font-style: italic; }
+
+.bill-profit-loss {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+}
+
+.bill-profit { color: #88cc44; }
+.bill-loss { color: #cc4444; }
+
+/* Debt bar */
+.bill-debt-bar {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid #5c3d11;
+  border-radius: 6px;
+}
+
+.bill-debt-warning { border-color: #ddaa22; }
+.bill-debt-critical { border-color: #cc4444; }
+
+.bill-debt-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.bill-debt-track {
+  width: 100%;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bill-debt-fill {
+  height: 100%;
+  background: #88cc44;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.bill-debt-warning .bill-debt-fill { background: #ddaa22; }
+.bill-debt-critical .bill-debt-fill { background: #cc4444; }
+
+.bill-debt-eviction {
+  font-size: 0.78rem;
+  color: #cc4444;
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+/* Insurance toggle */
+.bill-insurance-toggle {
+  width: 100%;
+}
+
+.insurance-toggle-btn {
+  width: 100%;
+  font-size: 0.78rem !important;
+  padding: 8px 10px !important;
+  text-align: center;
+  min-width: unset !important;
+}
+
+.insurance-on { border-color: #88cc44 !important; }
+.insurance-off { border-color: #5c3d11 !important; opacity: 0.7; }
+
+/* Payment options */
+.bill-payment-options {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bill-payment-prompt {
+  font-size: 0.85rem;
+  color: #f5e6c8;
+  margin: 0;
+  text-align: center;
+}
+
+.bill-pay-btn {
+  width: 100%;
+  padding: 10px 12px !important;
+  min-width: unset !important;
+  font-size: 0.85rem !important;
+}
+
+.bill-pay-now { border-color: #88cc44 !important; }
+.bill-pay-defer { border-color: #ddaa22 !important; }
+.bill-pay-loan { border-color: #cc8844 !important; }
+
+.bill-saving { color: #88cc44; font-size: 0.8em; }
+
+/* ======================================================
+   MBW-NEW: Shop sell/downgrade/fire buttons
+   ====================================================== */
+.shop-manage-section {
+  margin-top: 10px;
+  border-top: 1px solid #5c3d11;
+  padding-top: 8px;
+}
+
+.shop-manage-title {
+  font-size: 0.75rem;
+  color: #a88850;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px;
+}
+
+.upgrade-manage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.upgrade-manage-name {
+  font-size: 0.82rem;
+  color: #c8a86a;
+}
+
+.upgrade-manage-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.shop-downgrade-btn,
+.shop-sell-btn,
+.shop-fire-btn {
+  font-size: 0.75rem !important;
+  padding: 4px 8px !important;
+  min-width: unset !important;
+  background: #3a1a0a !important;
+}
+
+.shop-sell-btn { border-color: #cc4444 !important; }
+.shop-downgrade-btn { border-color: #cc8844 !important; }
+.shop-fire-btn { border-color: #cc4444 !important; }
+
+/* Staff card fire button positioning */
+.upgrade-card { position: relative; }
+
+/* ======================================================
+   MBW-NEW: Burglary & confirm overlays
+   ====================================================== */
+.burglary-overlay,
+.confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.burglary-card,
+.confirm-card {
+  background: #2b1a00;
+  border: 2px solid #cc4444;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 280px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.burglary-insured { color: #88cc44; font-size: 0.85rem; margin: 0; }
+.burglary-uninsured { color: #cc4444; font-size: 0.85rem; margin: 0; }
+
+.confirm-refund { color: #88cc44; margin: 0; font-size: 0.9rem; }
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirm-actions button {
+  min-width: 80px !important;
+  padding: 8px 16px !important;
+}

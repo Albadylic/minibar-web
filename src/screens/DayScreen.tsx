@@ -25,6 +25,7 @@ import { achievementSystem } from '../engine/systems/achievementSystem'
 import { AchievementToast } from '../components/AchievementToast'
 import { PowerupBar } from '../components/PowerupBar'
 import { getUnlockedDrinks } from '../config/drinks'
+import { FINANCES_CONFIG } from '../config/finances'
 import type { PowerupType } from '../types/achievements'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { DECORATIONS_BY_ID } from '../config/decorations'
@@ -49,6 +50,9 @@ export function DayScreen() {
       update({ unlockedDrinks: allUnlocked })
     }
     const unlockedDrinks = hasNewDrinks ? allUnlocked : save.unlockedDrinks
+
+    // MBW-NEW: Reset per-day supply tracking
+    useGameStore.getState().resetDailySupply()
 
     // MBW-83: pendingEvent was rolled in ShopScreen; pass it to DayConfig
     const dayConfig = generateDayConfig(save, pendingEvent)
@@ -124,6 +128,17 @@ export function DayScreen() {
       if (cancelled || !pixiApp.app) return
       setPixiReady(true)
       barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades, extraSeatTier)
+
+      // MBW-NEW: Initialize tap fill/availability from current supply state
+      const supplies = save.finances.supplies
+      for (const drinkId of unlockedDrinks) {
+        const supply = supplies[drinkId]
+        if (!supply || supply.remaining === 0) {
+          barScene.setTapAvailable(drinkId, false)
+        } else {
+          barScene.updateTapFill(drinkId, supply.remaining / FINANCES_CONFIG.DEFAULT_SUPPLY_CAPACITY)
+        }
+      }
 
       // MBW-NEW: Render earned decorations as 8×8 gold squares (placeholder sprites)
       for (const id of save.decorations) {

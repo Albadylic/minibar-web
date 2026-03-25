@@ -36,7 +36,7 @@ function ReviewCard({ r, showPagination, page, total, onPrev, onNext }: {
 }
 
 export function WeeklyReportScreen() {
-  const { gameSave, endWeek, goToScreen, pendingEvent } = useGameStore()
+  const { gameSave, endWeek, goToScreen } = useGameStore()
 
   const completedDay = gameSave.dayNumber - 1
   const completedWeek = Math.ceil(completedDay / 7)
@@ -76,11 +76,7 @@ export function WeeklyReportScreen() {
 
   function handleStartNextWeek() {
     endWeek()
-    if (pendingEvent) {
-      goToScreen('EVENT_NOTICE')
-    } else {
-      goToScreen('DAY_IN_PROGRESS')
-    }
+    goToScreen('WEEKLY_BILL')
   }
 
   if (isWeek1End) {

@@ -48,6 +48,11 @@ export type GameEventMap = {
   // MBW-NEW: Achievements & Powerups
   ACHIEVEMENT_COMPLETED: { id: string; tier: 'bronze' | 'silver' | 'gold'; reward: AchievementReward }
   POWERUP_ACTIVATED: { type: string }
+
+  // MBW-NEW: Bar Finances events
+  SUPPLY_DEPLETED: { drinkId: string }
+  UPGRADE_DAMAGED: { upgradeId: string; newTier: number; wasInsured: boolean }
+  BURGLARY_OCCURRED: { upgradeId: string; covered: boolean }
 }
 
 type EventHandler<T> = (payload: T) => void

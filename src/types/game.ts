@@ -1,11 +1,51 @@
 // MBW-6: Top-level game states
 // MBW-NEW: WEEKLY_REPORT screen added for end-of-week rating reveal
 // MBW-NEW: ACHIEVEMENTS screen added for dedicated achievements page
-export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'EVENT_NOTICE' | 'WEEKLY_REPORT' | 'ACHIEVEMENTS'
+// MBW-NEW: RESTOCK and WEEKLY_BILL screens added for Bar Finances system
+export type GameScreen = 'MAIN_MENU' | 'DAY_IN_PROGRESS' | 'BETWEEN_DAY_SHOP' | 'GAME_OVER' | 'EVENT_NOTICE' | 'WEEKLY_REPORT' | 'ACHIEVEMENTS' | 'RESTOCK' | 'WEEKLY_BILL'
 
 // MBW-3: GameSave — persisted to localStorage via Zustand
 import type { Review, WeeklyHistoryEntry } from './review'
 import type { PowerupType } from './achievements'
+
+// MBW-NEW: Bar Finances types
+export interface SupplyState {
+  remaining: number
+  usedToday: number
+  totalUsedThisWeek: number
+  totalSpentThisWeek: number
+}
+
+export interface LoanRecord {
+  principal: number
+  interestRate: number  // 0.10
+  weekTaken: number
+}
+
+export interface WeeklyBillRecord {
+  weekNumber: number
+  income: { drinks: number; total: number }
+  expenses: {
+    rent: number
+    insurance: number
+    wages: number
+    loanRepayments: number
+    suppliesInfoOnly: number  // informational — already paid daily
+    total: number             // rent + insurance + wages + loanRepayments
+  }
+  profitLoss: number
+  paymentMethod: 'immediate' | 'deferred' | 'loan'
+}
+
+export interface GameFinances {
+  supplies: Record<string, SupplyState>
+  outstandingDebt: number
+  loans: LoanRecord[]
+  insuranceOptedIn: boolean
+  weeklyBillHistory: WeeklyBillRecord[]
+  suppliesSpentThisWeek: number   // cumulative restock spend this week
+  weeklyRevenue: number           // coins earned from serving this week
+}
 
 export interface GameSave {
   // Core progression
@@ -67,6 +107,9 @@ export interface GameSave {
   // MBW-NEW: Decorations earned from achievements
   decorations: string[]
 
+  // MBW-NEW: Bar Finances — supply inventory, debt, loans, insurance
+  finances: GameFinances
+
   // MBW-173: Track which tutorial popups have been shown (so they don't repeat)
   shownTutorials: string[]
 
@@ -75,7 +118,7 @@ export interface GameSave {
   version: number
 }
 
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 export const initialGameSave: GameSave = {
   dayNumber: 1,
@@ -116,6 +159,15 @@ export const initialGameSave: GameSave = {
     inventory: {},
   },
   decorations: [],
+  finances: {
+    supplies: {},
+    outstandingDebt: 0,
+    loans: [],
+    insuranceOptedIn: false,
+    weeklyBillHistory: [],
+    suppliesSpentThisWeek: 0,
+    weeklyRevenue: 0,
+  },
   shownTutorials: [],
   lastSavedAt: 0,
   version: SAVE_VERSION,
