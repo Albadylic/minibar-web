@@ -114,7 +114,7 @@ class EntertainerSystem {
     e.tipChoice = choice
 
     useHudStore.setState({ tipPrompt: null })
-    eventDispatcher.emit('ENTERTAINER_TIPPED', { entertainerId: e.id, amount })
+    eventDispatcher.emit('ENTERTAINER_TIPPED', { entertainerId: e.id, amount, wasGenerous: choice === 0 })
     this.startLeaving()
   }
 

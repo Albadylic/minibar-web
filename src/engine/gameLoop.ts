@@ -40,6 +40,8 @@ import { waiterSystem } from './systems/waiterSystem'
 import { kingsTraySystem } from './systems/kingsTraySystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
+import type { PowerupType } from '../types/achievements'
+import { drinkServingSystem } from './systems/drinkServingSystem'
 
 // MBW-10/41/51/83: Generate DayConfig from current save — applies owned upgrade effects + day scaling
 // event is determined externally (ShopScreen rolls it) and passed in here
@@ -176,6 +178,13 @@ class GameLoop {
   private wrongDrinks = 0
   private unlockedDrinks: string[] = []
 
+  // MBW-NEW: Powerup state — reset each day in start()
+  private _doubleMoney = false
+  private timeFreezeRemaining = 0
+  private bouncerRushUsedToday = false
+  private timeFreezeUsedToday = false
+  private serveAllUsedToday = false
+
   // MBW-10: Start the day — called by DayScreen on mount
   start(
     dayConfig: DayConfig,
@@ -196,6 +205,11 @@ class GameLoop {
     this.wrongDrinks = 0
     this.unlockedDrinks = unlockedDrinks
     this.accumulator = 0
+    this._doubleMoney = false
+    this.timeFreezeRemaining = 0
+    this.bouncerRushUsedToday = false
+    this.timeFreezeUsedToday = false
+    this.serveAllUsedToday = false
 
     customerSystem.reset()
     brawlSystem.reset()
@@ -208,6 +222,7 @@ class GameLoop {
       coins: initialCoins,
       displayedRating: gameSave.displayedRating,
       selectedDrinkId: null,
+      inGamePowerupUsedToday: {},
     })
 
     this.lastTime = performance.now()
@@ -241,6 +256,12 @@ class GameLoop {
   // MBW-8: Fixed-step simulation update
   private update(dt: number): void {
     if (this.dayEndedFired) return
+
+    // MBW-NEW: Time Freeze powerup — pause game timer for N seconds
+    if (this.timeFreezeRemaining > 0) {
+      this.timeFreezeRemaining = Math.max(0, this.timeFreezeRemaining - dt)
+      return
+    }
 
     this.timeElapsed += dt
     const timeRemaining = Math.max(DAY_DURATION - this.timeElapsed, 0)
@@ -419,6 +440,48 @@ class GameLoop {
 
   get selectedDrink(): string | null {
     return this.selectedDrinkId
+  }
+
+  get doubleMoney(): boolean {
+    return this._doubleMoney
+  }
+
+  // MBW-NEW: Activate an in-game powerup (1 per day limit, spends from inventory)
+  activatePowerup(type: PowerupType): boolean {
+    const { spendPowerup } = useGameStore.getState()
+    if (type === 'BOUNCER_RUSH') {
+      if (this.bouncerRushUsedToday) return false
+      if (!spendPowerup('BOUNCER_RUSH')) return false
+      brawlSystem.resolveAll()
+      this.bouncerRushUsedToday = true
+    } else if (type === 'TIME_FREEZE') {
+      if (this.timeFreezeUsedToday) return false
+      if (!spendPowerup('TIME_FREEZE')) return false
+      this.timeFreezeRemaining = 10
+      this.timeFreezeUsedToday = true
+    } else if (type === 'SERVE_ALL') {
+      if (this.serveAllUsedToday) return false
+      if (!spendPowerup('SERVE_ALL')) return false
+      drinkServingSystem.serveAll()
+      this.serveAllUsedToday = true
+    } else {
+      return false
+    }
+    useHudStore.setState((s) => ({
+      inGamePowerupUsedToday: { ...s.inGamePowerupUsedToday, [type]: true },
+    }))
+    eventDispatcher.emit('POWERUP_ACTIVATED', { type })
+    return true
+  }
+
+  // MBW-NEW: Apply a pre-day powerup (called by DayScreen after gameLoop.start())
+  applyPreDayPowerup(type: PowerupType): void {
+    if (type === 'DOUBLE_MONEY') {
+      this._doubleMoney = true
+    } else if (type === 'RATINGS_BOOST') {
+      const { displayedRating } = useHudStore.getState()
+      useHudStore.setState({ displayedRating: Math.min(5.0, displayedRating + 1.0) })
+    }
   }
 
   get isRunning(): boolean {

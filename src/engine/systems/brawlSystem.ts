@@ -185,6 +185,12 @@ class BrawlSystem {
     this.resolveBrawl(brawlId, true)
   }
 
+  // MBW-NEW: Bouncer Rush powerup — resolve all active brawls instantly
+  resolveAll(): void {
+    const ids = this.brawls.map((b) => b.id)
+    for (const id of ids) this.resolveBrawl(id, false)
+  }
+
   getBrawlForCustomer(customerId: string): BrawlEntity | undefined {
     return this.brawls.find(
       (b) => b.instigatorId === customerId || b.disruptedCustomerIds.includes(customerId),

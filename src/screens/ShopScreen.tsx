@@ -10,6 +10,8 @@ import { useDayResultStore } from '../store/dayResultStore'
 import { useHudStore } from '../store/hudStore'
 import { UPGRADES, type UpgradeConfig } from '../config/upgrades'
 import { rollNextDayEvent } from '../config/events'
+import { PRE_DAY_POWERUPS, POWERUP_CONFIGS } from '../config/powerups'
+import type { PowerupType } from '../types/achievements'
 import { getPendingTutorials } from '../config/tutorials'
 import {
   ENTERTAINER_CONFIGS,
@@ -69,7 +71,7 @@ function pickStaffUpgrades(upgrades: UpgradeConfig[]): UpgradeConfig[] {
 type ShopTab = 'upgrades' | 'staff'
 
 export function ShopScreen() {
-  const { goToScreen, gameSave, purchaseUpgrade, updateSave, setPendingEvent } = useGameStore()
+  const { goToScreen, gameSave, purchaseUpgrade, updateSave, setPendingEvent, purchasePowerup } = useGameStore()
   const completedDay = gameSave.dayNumber - 1
   const upcomingDay = gameSave.dayNumber
   const lastResult = useDayResultStore((s) => s.lastResult)
@@ -111,6 +113,7 @@ export function ShopScreen() {
 
   const [tipEmoji, setTipEmoji] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ShopTab>('upgrades')
+  const achievementSummary = useHudStore((s) => s.pendingAchievementSummary)
   const [purchasedToday, setPurchasedToday] = useState<Set<string>>(new Set())
 
   const shopUpgrades = useMemo(
@@ -187,9 +190,12 @@ export function ShopScreen() {
       updateSave({ daysSinceLastGameDay: gameSave.daysSinceLastGameDay + 1 })
     }
 
+    const hasPredayPowerups = (PRE_DAY_POWERUPS as PowerupType[]).some(
+      (t) => gameSave.powerups.unlockedTypes.includes(t) && (gameSave.powerups.inventory[t] ?? 0) > 0,
+    )
     if (isEndOfWeek) {
       goToScreen('WEEKLY_REPORT')
-    } else if (event) {
+    } else if (event || hasPredayPowerups) {
       goToScreen('EVENT_NOTICE')
     } else {
       goToScreen('DAY_IN_PROGRESS')
@@ -230,8 +236,28 @@ export function ShopScreen() {
         </div>
       )}
 
+      {/* MBW-NEW: Achievement summary overlay — shown after earning achievements in-day */}
+      {!tipPrompt && achievementSummary && achievementSummary.length > 0 && (
+        <div className="achievement-summary-overlay">
+          <div className="achievement-summary-card">
+            <h3>Achievements Earned!</h3>
+            <div className="achievement-summary-list">
+              {achievementSummary.map((a) => (
+                <div key={a.id} className="achievement-summary-item">
+                  <span>{a.tier === 'gold' ? '🥇' : a.tier === 'silver' ? '🥈' : '🥉'}</span>
+                  <span className="ach-summary-name">{a.name}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => useHudStore.setState({ pendingAchievementSummary: null })}>
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MBW-173: Tutorial overlay — shown one at a time before the shop is usable */}
-      {!tipPrompt && activeTutorial && (
+      {!tipPrompt && !achievementSummary?.length && activeTutorial && (
         <div className="tutorial-overlay">
           <div className="tutorial-card">
             <h3 className="tutorial-title">{activeTutorial.title}</h3>
@@ -299,9 +325,37 @@ export function ShopScreen() {
         </div>
       )}
 
-      <button onClick={handleStartNext}>
-        {isEndOfWeek ? 'Weekly Report' : `Start Day ${gameSave.dayNumber}`}
-      </button>
+      {/* MBW-NEW: Powerup shop section */}
+      {gameSave.powerups.unlockedTypes.length > 0 && (
+        <div className="shop-powerups">
+          <p className="shop-powerups-title">Powerups</p>
+          {POWERUP_CONFIGS.filter((p) => gameSave.powerups.unlockedTypes.includes(p.type)).map((p) => {
+            const qty = gameSave.powerups.inventory[p.type] ?? 0
+            return (
+              <div key={p.type} className="shop-powerup-row">
+                <span className="shop-powerup-label">{p.emoji} {p.label}</span>
+                <span className="shop-powerup-stock">×{qty}</span>
+                <button
+                  className="shop-powerup-buy"
+                  disabled={gameSave.coins < p.buyPrice}
+                  onClick={() => purchasePowerup(p.type)}
+                >
+                  🪙{p.buyPrice}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="shop-bottom-actions">
+        <button className="shop-achievements-btn" onClick={() => goToScreen('ACHIEVEMENTS')}>
+          🎖️ Achievements
+        </button>
+        <button onClick={handleStartNext}>
+          {isEndOfWeek ? 'Weekly Report' : `Start Day ${gameSave.dayNumber}`}
+        </button>
+      </div>
     </div>
   )
 }

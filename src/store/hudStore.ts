@@ -2,6 +2,7 @@
 // React HUD components subscribe here; values are NOT persisted
 import { create } from 'zustand'
 import type { DayPhase } from '../types/day'
+import type { CompletedAchievement } from '../types/achievements'
 
 // MBW-120: Tip prompt shown when entertainer reaches bar at Last Orders
 export interface TipPrompt {
@@ -20,6 +21,12 @@ interface HudState {
   selectedDrinkId: string | null
   performingEntertainer: string | null  // MBW-116: null = no performer
   tipPrompt: TipPrompt | null           // MBW-120: non-null = show tip prompt overlay
+  // MBW-NEW: Achievement notifications
+  achievementToastQueue: CompletedAchievement[]  // queued toasts to show in-game
+  pendingAchievementSummary: CompletedAchievement[] | null  // shown on ShopScreen
+  // MBW-NEW: Powerup transient state
+  inGamePowerupUsedToday: Record<string, boolean>  // reset in gameLoop.start()
+  pendingPreDayPowerups: string[]                  // set in EventNoticeScreen, consumed by DayScreen
 }
 
 export const useHudStore = create<HudState>()(() => ({
@@ -30,4 +37,8 @@ export const useHudStore = create<HudState>()(() => ({
   selectedDrinkId: null,
   performingEntertainer: null,
   tipPrompt: null,
+  achievementToastQueue: [],
+  pendingAchievementSummary: null,
+  inGamePowerupUsedToday: {},
+  pendingPreDayPowerups: [],
 }))

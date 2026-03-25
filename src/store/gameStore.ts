@@ -9,6 +9,9 @@ import type { EventType } from '../types/day'
 import { UPGRADES_BY_ID } from '../config/upgrades'
 import { computeDisplayedRating } from '../config/reviewConfig'
 import type { WeeklyHistoryEntry } from '../types/review'
+import type { PowerupType, CompletedAchievement } from '../types/achievements'
+import { ACHIEVEMENTS_BY_ID } from '../config/achievements'
+import { POWERUP_CONFIGS_BY_TYPE } from '../config/powerups'
 
 interface GameState {
   // UI navigation state (not persisted — resets to MAIN_MENU on load)
@@ -36,6 +39,13 @@ interface GameState {
 
   // MBW-NEW: Finalise the current week — compute rating, push history, clear reviews
   endWeek: () => void
+
+  // MBW-NEW: Achievements & Powerups actions
+  completeAchievement: (id: string) => CompletedAchievement | null
+  grantPowerup: (type: PowerupType, quantity: number) => void
+  unlockPowerup: (type: PowerupType) => void
+  spendPowerup: (type: PowerupType) => boolean
+  purchasePowerup: (type: PowerupType) => boolean
 }
 
 // Runtime screen state is NOT persisted — always starts at MAIN_MENU
@@ -158,6 +168,151 @@ export const useGameStore = create<GameState>()(
             },
           }
         }),
+      // MBW-NEW: Mark an achievement as completed, grant its reward, return the completed record
+      completeAchievement: (id: string) => {
+        const config = ACHIEVEMENTS_BY_ID[id]
+        if (!config) return null
+
+        let result: CompletedAchievement | null = null
+        set((state) => {
+          if (state.gameSave.achievements.completed[id]) return state // already done
+
+          const completed: CompletedAchievement = {
+            id: config.id,
+            name: config.name,
+            tier: config.tier,
+            reward: config.reward,
+          }
+          result = completed
+
+          const newAchievements = {
+            ...state.gameSave.achievements,
+            completed: {
+              ...state.gameSave.achievements.completed,
+              [id]: { completedOnDay: state.gameSave.dayNumber },
+            },
+          }
+
+          // Apply coin reward
+          const coinDelta = config.reward.coins ?? 0
+
+          // Apply powerup unlock
+          const newPowerups = { ...state.gameSave.powerups }
+          if (config.reward.powerupUnlock) {
+            if (!newPowerups.unlockedTypes.includes(config.reward.powerupUnlock)) {
+              newPowerups.unlockedTypes = [...newPowerups.unlockedTypes, config.reward.powerupUnlock]
+            }
+          }
+          // Apply powerup grant
+          if (config.reward.powerupGrant) {
+            const { type, quantity } = config.reward.powerupGrant
+            newPowerups.inventory = {
+              ...newPowerups.inventory,
+              [type]: Math.min(99, (newPowerups.inventory[type] ?? 0) + quantity),
+            }
+          }
+
+          // Apply decoration unlock
+          const newDecorations = config.reward.decoration
+            ? [...new Set([...state.gameSave.decorations, config.reward.decoration])]
+            : state.gameSave.decorations
+
+          return {
+            gameSave: {
+              ...state.gameSave,
+              coins: state.gameSave.coins + coinDelta,
+              achievements: newAchievements,
+              powerups: newPowerups,
+              decorations: newDecorations,
+              lastSavedAt: Date.now(),
+            },
+          }
+        })
+        return result
+      },
+
+      // MBW-NEW: Add powerup stock to inventory (from achievement grant or purchase)
+      grantPowerup: (type: PowerupType, quantity: number) =>
+        set((state) => ({
+          gameSave: {
+            ...state.gameSave,
+            powerups: {
+              ...state.gameSave.powerups,
+              inventory: {
+                ...state.gameSave.powerups.inventory,
+                [type]: Math.min(99, (state.gameSave.powerups.inventory[type] ?? 0) + quantity),
+              },
+            },
+            lastSavedAt: Date.now(),
+          },
+        })),
+
+      // MBW-NEW: Unlock a powerup type without granting stock
+      unlockPowerup: (type: PowerupType) =>
+        set((state) => {
+          if (state.gameSave.powerups.unlockedTypes.includes(type)) return state
+          return {
+            gameSave: {
+              ...state.gameSave,
+              powerups: {
+                ...state.gameSave.powerups,
+                unlockedTypes: [...state.gameSave.powerups.unlockedTypes, type],
+              },
+              lastSavedAt: Date.now(),
+            },
+          }
+        }),
+
+      // MBW-NEW: Consume 1 unit of a powerup; returns true if successful
+      spendPowerup: (type: PowerupType) => {
+        let result = false
+        set((state) => {
+          const current = state.gameSave.powerups.inventory[type] ?? 0
+          if (current <= 0) return state
+          result = true
+          return {
+            gameSave: {
+              ...state.gameSave,
+              powerups: {
+                ...state.gameSave.powerups,
+                inventory: {
+                  ...state.gameSave.powerups.inventory,
+                  [type]: current - 1,
+                },
+              },
+              lastSavedAt: Date.now(),
+            },
+          }
+        })
+        return result
+      },
+
+      // MBW-NEW: Buy 1 unit of a powerup from the shop
+      purchasePowerup: (type: PowerupType) => {
+        const config = POWERUP_CONFIGS_BY_TYPE[type]
+        if (!config) return false
+
+        let result = false
+        set((state) => {
+          if (state.gameSave.coins < config.buyPrice) return state
+          result = true
+          return {
+            gameSave: {
+              ...state.gameSave,
+              coins: state.gameSave.coins - config.buyPrice,
+              powerups: {
+                ...state.gameSave.powerups,
+                inventory: {
+                  ...state.gameSave.powerups.inventory,
+                  [type]: Math.min(99, (state.gameSave.powerups.inventory[type] ?? 0) + 1),
+                },
+              },
+              lastSavedAt: Date.now(),
+            },
+          }
+        })
+        return result
+      },
     }),
     {
       name: 'minibar-save',
@@ -192,6 +347,31 @@ export const useGameStore = create<GameState>()(
           save.displayedRating = 0
           save.weeklyHistory = []
           save.currentWeekReviews = []
+        }
+
+        if (version < 4) {
+          // MBW-NEW: Add achievements, powerups, new stats fields
+          const save = ps.gameSave as GameSave
+          save.stats = {
+            ...save.stats,
+            totalDrinksServed: save.stats.totalDrinksServed ?? 0,
+            totalMessesCleaned: save.stats.totalMessesCleaned ?? 0,
+            totalDrunksEscorted: save.stats.totalDrunksEscorted ?? 0,
+            totalEntertainersHosted: save.stats.totalEntertainersHosted ?? 0,
+            totalGenerousTips: save.stats.totalGenerousTips ?? 0,
+            totalRichServed: save.stats.totalRichServed ?? 0,
+            seenEntertainers: (save.stats as { seenEntertainers?: string[] }).seenEntertainers ?? [],
+          }
+          save.achievements = save.achievements ?? {
+            completed: {},
+            consecutivePerfectWeeks: 0,
+            ratingEverBelow2_5: false,
+          }
+          save.powerups = save.powerups ?? {
+            unlockedTypes: [],
+            inventory: {},
+          }
+          save.decorations = save.decorations ?? []
         }
 
         return ps

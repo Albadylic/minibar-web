@@ -21,8 +21,14 @@ import { entertainerSystem } from '../engine/systems/entertainerSystem'
 import { waiterSystem } from '../engine/systems/waiterSystem'
 import { customerSystem } from '../engine/systems/customerSystem'
 import { kingsTraySystem } from '../engine/systems/kingsTraySystem'
+import { achievementSystem } from '../engine/systems/achievementSystem'
+import { AchievementToast } from '../components/AchievementToast'
+import { PowerupBar } from '../components/PowerupBar'
 import { getUnlockedDrinks } from '../config/drinks'
+import type { PowerupType } from '../types/achievements'
 import { UPGRADES_BY_ID } from '../config/upgrades'
+import { DECORATIONS_BY_ID } from '../config/decorations'
+import { Graphics } from 'pixi.js'
 import { eventDispatcher } from '../engine/events/eventDispatcher'
 import { DAY_DURATION } from '../types/day'
 
@@ -47,6 +53,14 @@ export function DayScreen() {
     // MBW-83: pendingEvent was rolled in ShopScreen; pass it to DayConfig
     const dayConfig = generateDayConfig(save, pendingEvent)
     gameLoop.start(dayConfig, save.coins, unlockedDrinks)
+
+    // MBW-NEW: Apply any pre-day powerups selected in EventNoticeScreen
+    const { pendingPreDayPowerups } = useHudStore.getState()
+    for (const type of pendingPreDayPowerups) {
+      gameLoop.applyPreDayPowerup(type as PowerupType)
+    }
+    useHudStore.setState({ pendingPreDayPowerups: [] })
+
     // MBW-147/160: Extra Seating upgrade tier controls which seats are active
     const extraSeatTier = save.upgrades['extra_seating']?.tier ?? 0
     customerSystem.setExtraSeatTier(extraSeatTier)
@@ -55,8 +69,10 @@ export function DayScreen() {
     securitySystem.init(bouncerTier)
     drinkServingSystem.init()
     reviewSystem.init()
+    achievementSystem.init()
 
     return () => {
+      achievementSystem.destroy()
       reviewSystem.destroy()
       drinkServingSystem.destroy()
       brawlSystem.destroy()
@@ -108,6 +124,18 @@ export function DayScreen() {
       if (cancelled || !pixiApp.app) return
       setPixiReady(true)
       barScene.init(pixiApp.app, unlockedDrinks, ownedUpgrades, extraSeatTier)
+
+      // MBW-NEW: Render earned decorations as 8×8 gold squares (placeholder sprites)
+      for (const id of save.decorations) {
+        const cfg = DECORATIONS_BY_ID[id]
+        if (!cfg) continue
+        const g = new Graphics()
+        g.rect(0, 0, 8, 8).fill(cfg.color)
+        g.x = cfg.position.x
+        g.y = cfg.position.y
+        pixiApp.app!.stage.addChild(g)
+      }
+
       // MBW-109: Noble's Visit king's tray mechanic
       const kingsTray = gameLoop.state.dayConfig?.kingsTray
       if (kingsTray) {
@@ -158,7 +186,9 @@ export function DayScreen() {
       <div className="hud-overlay">
         <DayHud dayNumber={gameSave.dayNumber} />
       </div>
+      <AchievementToast />
       <TipPromptOverlay />
+      <PowerupBar />
     </div>
   )
 }

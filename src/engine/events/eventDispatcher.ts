@@ -1,6 +1,7 @@
 // MBW-9: Typed event dispatcher
 // Systems subscribe to events without modifying core. New events added per version.
 import type { DayPhase } from '../../types/day'
+import type { AchievementReward } from '../../types/achievements'
 
 // All game events and their payload types
 export type GameEventMap = {
@@ -33,16 +34,20 @@ export type GameEventMap = {
 
   // MBW-99/100: Mess events
   MESS_SPAWNED: { messId: string; position: { x: number; y: number } }
-  MESS_CLEANED: { messId: string }
+  MESS_CLEANED: { messId: string; byPlayer: boolean }
 
   // MBW-116/121: Entertainer events
   ENTERTAINER_ARRIVED: { entertainerId: string }
-  ENTERTAINER_TIPPED: { entertainerId: string; amount: number }
+  ENTERTAINER_TIPPED: { entertainerId: string; amount: number; wasGenerous: boolean }
   ENTERTAINER_LEFT: { entertainerId: string }
 
   // MBW-109: Noble's Visit — king's tray mechanic
   KINGS_TRAY_SLOT_FILLED: { slotIndex: number; drinkId: string }
   KINGS_TRAY_RESOLVED: { complete: boolean; coinsEarned: number }
+
+  // MBW-NEW: Achievements & Powerups
+  ACHIEVEMENT_COMPLETED: { id: string; tier: 'bronze' | 'silver' | 'gold'; reward: AchievementReward }
+  POWERUP_ACTIVATED: { type: string }
 }
 
 type EventHandler<T> = (payload: T) => void

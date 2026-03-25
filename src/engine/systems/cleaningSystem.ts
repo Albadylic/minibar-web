@@ -161,15 +161,15 @@ class CleaningSystem {
     g.position.set(clampedX, clampedY)
     g.eventMode = 'static'
     g.cursor = 'pointer'
-    g.on('pointerdown', () => this.cleanMess(mess.id))
+    g.on('pointerdown', () => this.cleanMess(mess.id, true))
     this.stage.addChild(g)
     this.messDisplays.set(mess.id, g)
 
     eventDispatcher.emit('MESS_SPAWNED', { messId: mess.id, position: { x: clampedX, y: clampedY } })
   }
 
-  // MBW-100: Player taps a mess to clean it
-  cleanMess(messId: string): void {
+  // MBW-100: Player taps a mess to clean it (byPlayer=false when NPC cleaner cleans)
+  cleanMess(messId: string, byPlayer = false): void {
     const idx = this.messes.findIndex((m) => m.id === messId)
     if (idx === -1) return
     const mess = this.messes[idx]!
@@ -196,7 +196,7 @@ class CleaningSystem {
       this.cleaner.waypoints = []
     }
 
-    eventDispatcher.emit('MESS_CLEANED', { messId })
+    eventDispatcher.emit('MESS_CLEANED', { messId, byPlayer })
   }
 
   // MBW-101: Cleaner NPC tick — pathfind to nearest mess/table, clean on arrival

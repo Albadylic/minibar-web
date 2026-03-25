@@ -7,7 +7,9 @@ import { gameLoop } from '../gameLoop'
 import { customerSystem } from './customerSystem'
 import { barScene } from '../renderer/barScene'
 import { DRINKS_BY_ID } from '../../config/drinks'
+import type { DrinkConfig } from '../../config/drinks'
 import { entertainerSystem } from './entertainerSystem'
+import type { CustomerEntity } from '../../entities/customer'
 
 class DrinkServingSystem {
   // MBW-26: Toggle drink selection on tap click
@@ -44,30 +46,43 @@ class DrinkServingSystem {
     const isCorrect = customer.drinkOrder === selectedDrinkId
 
     if (isCorrect) {
-      // MBW-28/91: Award coins with type multiplier (rich = 1.8×) + tip jar on fast serves
-      const isFastServe = customer.patienceTimer / customer.patienceMax > 0.5
-      const coins = Math.round(
-        (drink?.coinReward ?? 0) *
-          customer.coinMultiplier *
-          gameLoop.dayCoinMultiplier *
-          entertainerSystem.getCoinBoostMult(),
-      ) + (isFastServe ? gameLoop.tipJarBonus : 0)
-      gameLoop.addCoins(coins)
-      gameLoop.recordCustomerServed()
-
-      customerSystem.serveCustomer(customerId)
-
-      eventDispatcher.emit('DRINK_SERVED', {
-        customerId,
-        drinkId: selectedDrinkId,
-        wasCorrect: true,
-        coinsEarned: coins,
-      })
+      this._doServe(customer, drink!)
     } else {
       gameLoop.recordWrongDrink()
       customerSystem.wrongDrink(customerId)
 
       eventDispatcher.emit('WRONG_DRINK', { customerId, drinkId: selectedDrinkId })
+    }
+  }
+
+  // MBW-NEW: Shared serve logic — used by click handler and serveAll()
+  private _doServe(customer: CustomerEntity, drink: DrinkConfig): void {
+    const isFastServe = customer.patienceTimer / customer.patienceMax > 0.5
+    let coins = Math.round(
+      drink.coinReward *
+        customer.coinMultiplier *
+        gameLoop.dayCoinMultiplier *
+        entertainerSystem.getCoinBoostMult(),
+    ) + (isFastServe ? gameLoop.tipJarBonus : 0)
+    if (gameLoop.doubleMoney) coins *= 2
+    gameLoop.addCoins(coins)
+    gameLoop.recordCustomerServed()
+    customerSystem.serveCustomer(customer.id)
+    eventDispatcher.emit('DRINK_SERVED', {
+      customerId: customer.id,
+      drinkId: drink.id,
+      wasCorrect: true,
+      coinsEarned: coins,
+    })
+  }
+
+  // MBW-NEW: Serve All powerup — instantly serves all WAITING customers their requested drink
+  serveAll(): void {
+    const waiting = customerSystem.customers.filter((c) => c.status === 'WAITING' && c.canBeServed)
+    for (const customer of waiting) {
+      const drink = DRINKS_BY_ID[customer.drinkOrder]
+      if (!drink) continue
+      this._doServe(customer, drink)
     }
   }
 
