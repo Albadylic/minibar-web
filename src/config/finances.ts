@@ -36,6 +36,7 @@ export const FINANCES_CONFIG = {
     bouncer: { 1: 40, 2: 65, 3: 90  },
     cleaner: { 1: 30, 2: 50, 3: 75  },
     doorman: { 1: 35, 2: 55, 3: 80  },
+    chef:    { 1: 55, 2: 80, 3: 110 },
     waiter:  { 1: 45, 2: 70, 3: 100 },
   } as const,
 

@@ -5,12 +5,14 @@
 // MBW-24: Lingering after served
 // MBW-74: Hooligan spawning on Game Days
 // MBW-156: Removed afternoon departure/return rule — hooligans stay for full day
-import type { CustomerEntity, CustomerType } from '../../entities/customer'
+// Food: table customers can order food (20% chance) when food is unlocked (Day 15+)
+import type { CustomerEntity, CustomerType, FoodOrderStage, WaitingIndicator } from '../../entities/customer'
 import { nextCustomerId, resetCustomerIdCounter } from '../../entities/customer'
 import type { DayPhase } from '../../types/day'
 import type { DayConfig } from '../../types/day'
 import { CUSTOMER_CONFIGS, randomSkin, randomInRange } from '../../config/customers'
 import { SEATS, SEATS_BY_ID, TABLES, DOORWAY } from '../../config/barLayout'
+import { FOOD_CONFIGS, FOOD_UNLOCK_DAY, FOOD_ORDER_PROBABILITY } from '../../config/food'
 import type { TableConfig } from '../../config/barLayout'
 import { DRINKS_BY_ID } from '../../config/drinks'
 import { eventDispatcher } from '../events/eventDispatcher'
@@ -46,6 +48,12 @@ class CustomerSystem {
   // MBW-147/160: Called from DayScreen after game loop starts with the player's Extra Seating tier
   setExtraSeatTier(tier: number): void {
     this.extraSeatTier = tier
+  }
+
+  // Food: track the current day number to gate food ordering
+  private currentDayNumber = 1
+  setDayNumber(day: number): void {
+    this.currentDayNumber = day
   }
 
   // Main update — called each fixed tick from the game loop
@@ -175,7 +183,29 @@ class CustomerSystem {
   ): void {
     const config = CUSTOMER_CONFIGS[type]
     const skin = regular ? regular.skin : randomSkin()
-    const patienceMax = randomInRange(config.patience.min, config.patience.max) * patienceMultiplier
+    const seatConfig = SEATS_BY_ID[seatId]
+    const isTableSeat = seatConfig?.type === 'table_chair'
+
+    // Food: 20% chance for table customers when food is unlocked and customer can be served
+    const foodUnlocked = this.currentDayNumber >= FOOD_UNLOCK_DAY
+    const rollFoodOrder = foodUnlocked && isTableSeat && config.canBeServed && type !== 'DRUNK'
+      && Math.random() < FOOD_ORDER_PROBABILITY
+
+    let currentOrderType: 'drink' | 'food' = 'drink'
+    let foodOrderFoodId: string | null = null
+    let foodPatienceMax = 0
+
+    if (rollFoodOrder) {
+      currentOrderType = 'food'
+      const rolled = this.rollFoodOrder(type)
+      foodOrderFoodId = rolled.foodId
+      foodPatienceMax = rolled.patienceWindow1
+    }
+
+    const patienceMax = rollFoodOrder
+      ? foodPatienceMax * patienceMultiplier
+      : randomInRange(config.patience.min, config.patience.max) * patienceMultiplier
+
     // MBW-86: Weighted drink selection by customer type affinity
     const drinkOrder = this.rollDrinkOrder(unlockedDrinks, type)
 
@@ -204,11 +234,34 @@ class CustomerSystem {
       // MBW-NEW: Regular customer identity
       isRegular: regular !== undefined,
       regularId: regular?.id,
+      // Food order fields
+      currentOrderType,
+      foodOrderId: null,
+      foodOrderFoodId,
+      foodOrderStage: rollFoodOrder ? 'ORDERING' : null,
+      foodPatienceTimer: rollFoodOrder ? patienceMax : 0,
+      foodPatienceMax: patienceMax,
+      waitingIndicator: 'none',
+      eatProgress: 0,
+      eatDuration: 0,
     }
 
     this.occupiedSeatIds.add(seatId)
     this.customers.push(customer)
     eventDispatcher.emit('CUSTOMER_ARRIVED', { customerId: customer.id, seatId })
+  }
+
+  // Food: Weighted food selection by customer type affinity
+  private rollFoodOrder(type: CustomerType): { foodId: string; patienceWindow1: number } {
+    const weights = FOOD_CONFIGS.map((f) => f.customerAffinities[type] ?? 1.0)
+    const total = weights.reduce((s, w) => s + w, 0)
+    let r = Math.random() * total
+    for (let i = 0; i < FOOD_CONFIGS.length; i++) {
+      r -= weights[i]!
+      if (r <= 0) return { foodId: FOOD_CONFIGS[i]!.id, patienceWindow1: FOOD_CONFIGS[i]!.patienceWindow1 }
+    }
+    const last = FOOD_CONFIGS[FOOD_CONFIGS.length - 1]!
+    return { foodId: last.id, patienceWindow1: last.patienceWindow1 }
   }
 
   // MBW-86: Weighted selection — drink weights come from DrinkConfig.customerAffinities
@@ -251,6 +304,9 @@ class CustomerSystem {
       case 'BRAWLING':
         // MBW-78: Brawl system controls BRAWLING customers — no tick needed here
         break
+      case 'EATING':
+        this.updateEating(customer, dt)
+        break
       case 'LEAVING':
         this.updateLeaving(customer, dt) // MBW-22
         break
@@ -270,6 +326,7 @@ class CustomerSystem {
   // MBW-19: Patience countdown
   // MBW-78: Hooligans trigger a brawl instead of leaving when patience expires
   // MBW-116: Patience decay slowed while an entertainer is performing
+  // Food: Window 1 uses the same patience timer — customer leaves if food not acknowledged
   private updateWaiting(customer: CustomerEntity, dt: number): void {
     customer.patienceTimer -= dt * entertainerSystem.getDecayMult(customer.type)
     if (customer.patienceTimer <= 0) {
@@ -285,6 +342,32 @@ class CustomerSystem {
       // Normal customer — leave (review system handles rating impact separately)
       this.startLeaving(customer)
     }
+  }
+
+  // Food: customer eating their delivered meal
+  private updateEating(customer: CustomerEntity, dt: number): void {
+    if (customer.eatDuration <= 0) {
+      this.finishEating(customer)
+      return
+    }
+    customer.eatProgress += dt / customer.eatDuration
+    if (customer.eatProgress >= 1.0) {
+      this.finishEating(customer)
+    }
+  }
+
+  private finishEating(customer: CustomerEntity): void {
+    customer.eatProgress = 1.0
+    customer.foodOrderStage = null
+    customer.currentOrderType = 'drink'  // reset for potential reorder
+    customer.waitingIndicator = 'none'
+    eventDispatcher.emit('PLATE_EMPTY', { customerId: customer.id })
+
+    // Transition to linger/reorder — same as after a drink serve
+    const config = CUSTOMER_CONFIGS[customer.type]
+    customer.willReorder = Math.random() < config.reorderChance
+    customer.lingerTimer = randomInRange(config.linger.min, config.linger.max)
+    customer.status = 'SERVED_LINGERING'
   }
 
   // MBW-24: Linger after being served
@@ -501,6 +584,58 @@ class CustomerSystem {
 
   isOccupied(seatId: string): boolean {
     return this.occupiedSeatIds.has(seatId)
+  }
+
+  // Food: player tapped the food emoji — clear ORDERING state, start Window 2
+  acknowledgeFoodOrder(customerId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.waitingIndicator = 'greyed'
+  }
+
+  // Food: called when kitchenSystem creates a FoodOrder in the queue
+  setFoodOrderInQueue(customerId: string, orderId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.foodOrderId = orderId
+    customer.foodOrderStage = 'IN_QUEUE'
+    customer.waitingIndicator = 'greyed'
+  }
+
+  // Food: update stage as food moves through the pipeline
+  setFoodOrderStage(customerId: string, stage: FoodOrderStage): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.foodOrderStage = stage
+  }
+
+  // Food: update waiting indicator (greyed / ready_pulse / none)
+  setFoodWaitingIndicator(customerId: string, indicator: WaitingIndicator): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.waitingIndicator = indicator
+  }
+
+  // Food: called by kitchenSystem when food is delivered — transitions to EATING
+  startEating(customerId: string, eatDuration: number): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.eatProgress = 0
+    customer.eatDuration = eatDuration
+    customer.foodOrderStage = 'EATING'
+    customer.waitingIndicator = 'none'
+    customer.status = 'EATING'
+  }
+
+  // Food: Window 2 expired — customer leaves angry
+  foodOrderExpired(customerId: string): void {
+    const customer = this.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    customer.foodOrderId = null
+    customer.foodOrderStage = null
+    customer.currentOrderType = 'drink'
+    customer.waitingIndicator = 'none'
+    this.startLeaving(customer)
   }
 }
 

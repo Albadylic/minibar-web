@@ -1,27 +1,23 @@
-// MBW-182: Waiter NPC — autonomous drink serving
-// Tier 1: 1 order at a time, 70px/s
-// Tier 2: 2 concurrent orders, 100px/s
-// Tier 3: 3 concurrent orders, 130px/s, prioritises lowest-patience customers
+// Waiter NPC — food delivery from service counter to tables
+// Tier 1: 1 delivery at a time, slow
+// Tier 2: 2 simultaneous, faster
+// Tier 3: 3 simultaneous, fastest — prioritises lowest patience remaining
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
 import type { Application } from 'pixi.js'
 import type { WaiterWorker } from '../../entities/waiter'
+import { kitchenSystem } from './kitchenSystem'
 import { customerSystem } from './customerSystem'
-import { entertainerSystem } from './entertainerSystem'
-import { eventDispatcher } from '../events/eventDispatcher'
-import { gameLoop } from '../gameLoop'
-import { DRINKS_BY_ID } from '../../config/drinks'
-import { BAR_COUNTER_BOTTOM } from '../../config/barLayout'
+import { PLATE_SLOT_POSITIONS } from '../../config/barLayout'
 
 const WAITER_RADIUS = 8
-const REACH_DIST = 12  // canvas units — close enough to "arrive"
-// Waiter parks here when idle
-const WAITER_HOME = { x: 344, y: 570 }
-// Point on bar counter where waiter "picks up" the drink
-const BAR_PICKUP = { x: 187, y: BAR_COUNTER_BOTTOM }
-// Walk speed per tier (px/s)
+const REACH_DIST = 12
+// Waiter parks at bottom-right when idle
+const WAITER_HOME = { x: 351, y: 580 }
+// Service counter pickup point (near middle plate)
+const SERVICE_PICKUP = { x: PLATE_SLOT_POSITIONS[1]!.x, y: PLATE_SLOT_POSITIONS[1]!.y }
 const SPEEDS: Record<1 | 2 | 3, number> = { 1: 70, 2: 100, 3: 130 }
 
-const LABEL_STYLE = new TextStyle({ fontSize: 9, fill: 0xffffff, fontFamily: 'Georgia, serif' })
+const LABEL_STYLE = new TextStyle({ fontSize: 9, fill: 0x333333, fontFamily: 'Georgia, serif' })
 
 class WaiterSystem {
   private workers: WaiterWorker[] = []
@@ -29,22 +25,22 @@ class WaiterSystem {
   private labels: Map<number, Text> = new Map()
   private stage: Container | null = null
   private tier: 1 | 2 | 3 = 1
-  private prioritizeLowestPatience = false
+  private prioritiseLowest = false
 
-  init(app: Application, waiterTier: 1 | 2 | 3): void {
-    this.tier = waiterTier
-    this.prioritizeLowestPatience = waiterTier === 3
+  init(app: Application, tier: 1 | 2 | 3): void {
+    this.tier = tier
+    this.prioritiseLowest = tier === 3
     this.stage = new Container()
     app.stage.addChild(this.stage)
 
-    for (let i = 0; i < waiterTier; i++) {
+    for (let i = 0; i < tier; i++) {
       const worker: WaiterWorker = {
         id: i,
         status: 'IDLE',
-        position: { x: WAITER_HOME.x, y: WAITER_HOME.y },
-        targetPosition: { x: WAITER_HOME.x, y: WAITER_HOME.y },
+        position: { ...WAITER_HOME },
+        targetPosition: { ...WAITER_HOME },
         assignedCustomerId: null,
-        drinkToServe: null,
+        assignedPlateId: null,
       }
       this.workers.push(worker)
 
@@ -75,13 +71,12 @@ class WaiterSystem {
     if (this.workers.length === 0) return
     const speed = SPEEDS[this.tier]
 
-    // Build set of currently targeted customers before ticking (add to it as idle workers assign)
-    const targeted = new Set<string>(
-      this.workers.filter((w) => w.assignedCustomerId !== null).map((w) => w.assignedCustomerId!),
+    const assignedCustomers = new Set<string>(
+      this.workers.filter((w) => w.assignedCustomerId).map((w) => w.assignedCustomerId!),
     )
 
     for (const worker of this.workers) {
-      this.tickWorker(worker, dt, speed, targeted)
+      this.tickWorker(worker, dt, speed, assignedCustomers)
       const g = this.graphics.get(worker.id)
       const lbl = this.labels.get(worker.id)
       g?.position.set(worker.position.x, worker.position.y)
@@ -93,32 +88,55 @@ class WaiterSystem {
     worker: WaiterWorker,
     dt: number,
     speed: number,
-    targeted: Set<string>,
+    assignedCustomers: Set<string>,
   ): void {
     switch (worker.status) {
       case 'IDLE': {
-        const customerId = this.findCustomer(targeted)
-        if (!customerId) return
-        const customer = customerSystem.getCustomer(customerId)
-        if (!customer) return
-        worker.assignedCustomerId = customerId
-        worker.drinkToServe = customer.drinkOrder
-        worker.status = 'GOING_TO_BAR'
-        worker.targetPosition = { x: BAR_PICKUP.x, y: BAR_PICKUP.y }
-        targeted.add(customerId)
+        const result = kitchenSystem.getPlatedOrder()
+        if (!result) return
+        // Don't pick up if another worker is already assigned to this customer
+        if (assignedCustomers.has(result.customerId)) return
+
+        // Prioritise lowest patience if tier 3
+        let chosenCustomerId = result.customerId
+        let chosenPlateId = result.plate.id
+        if (this.prioritiseLowest) {
+          // Find the plate whose customer has the least patience remaining
+          let lowest = Infinity
+          for (const plate of kitchenSystem.plates) {
+            if (plate.status !== 'plated' || !plate.foodOrder) continue
+            if (assignedCustomers.has(plate.foodOrder.customerId)) continue
+            const c = customerSystem.getCustomer(plate.foodOrder.customerId)
+            if (!c) continue
+            const rem = plate.foodOrder.patienceRemaining
+            if (rem < lowest) {
+              lowest = rem
+              chosenCustomerId = plate.foodOrder.customerId
+              chosenPlateId = plate.id
+            }
+          }
+        }
+
+        worker.assignedCustomerId = chosenCustomerId
+        worker.assignedPlateId = chosenPlateId
+        worker.status = 'GOING_TO_SERVICE_COUNTER'
+        worker.targetPosition = { ...SERVICE_PICKUP }
+        assignedCustomers.add(chosenCustomerId)
         break
       }
 
-      case 'GOING_TO_BAR': {
+      case 'GOING_TO_SERVICE_COUNTER': {
         if (this.moveToward(worker, dt, speed)) {
-          // Customer may have left or been served while we were en route
-          const customer = worker.assignedCustomerId
-            ? customerSystem.getCustomer(worker.assignedCustomerId)
-            : null
-          if (!customer || customer.status !== 'WAITING') {
+          const plate = kitchenSystem.plates.find((p) => p.id === worker.assignedPlateId)
+          if (!plate || plate.status !== 'plated') {
             this.returnHome(worker)
             return
           }
+          const customer = worker.assignedCustomerId
+            ? customerSystem.getCustomer(worker.assignedCustomerId)
+            : null
+          if (!customer) { this.returnHome(worker); return }
+
           worker.status = 'GOING_TO_CUSTOMER'
           worker.targetPosition = { x: customer.position.x, y: customer.position.y }
         }
@@ -127,7 +145,13 @@ class WaiterSystem {
 
       case 'GOING_TO_CUSTOMER': {
         if (this.moveToward(worker, dt, speed)) {
-          this.serveAssignedCustomer(worker)
+          const plate = kitchenSystem.plates.find((p) => p.id === worker.assignedPlateId)
+          if (!plate || !plate.foodOrder || !worker.assignedCustomerId) {
+            this.returnHome(worker)
+            return
+          }
+          kitchenSystem.waiterDeliver(plate, worker.assignedCustomerId)
+          this.returnHome(worker)
         }
         break
       }
@@ -141,7 +165,6 @@ class WaiterSystem {
     }
   }
 
-  // Returns true when the worker reaches the target this tick
   private moveToward(worker: WaiterWorker, dt: number, speed: number): boolean {
     const dx = worker.targetPosition.x - worker.position.x
     const dy = worker.targetPosition.y - worker.position.y
@@ -159,57 +182,11 @@ class WaiterSystem {
     return false
   }
 
-  private serveAssignedCustomer(worker: WaiterWorker): void {
-    const customerId = worker.assignedCustomerId
-    if (!customerId) { this.returnHome(worker); return }
-
-    const customer = customerSystem.getCustomer(customerId)
-    if (!customer || customer.status !== 'WAITING') {
-      this.returnHome(worker)
-      return
-    }
-
-    const drink = DRINKS_BY_ID[customer.drinkOrder]
-    const coins = Math.round(
-      (drink?.coinReward ?? 0)
-      * customer.coinMultiplier
-      * gameLoop.dayCoinMultiplier
-      * entertainerSystem.getCoinBoostMult(),
-    )
-
-    gameLoop.addCoins(coins)
-    gameLoop.recordCustomerServed()
-    customerSystem.serveCustomer(customerId)
-
-    eventDispatcher.emit('DRINK_SERVED', {
-      customerId,
-      drinkId: customer.drinkOrder,
-      wasCorrect: true,
-      coinsEarned: coins,
-    })
-
-    this.returnHome(worker)
-  }
-
   private returnHome(worker: WaiterWorker): void {
     worker.assignedCustomerId = null
-    worker.drinkToServe = null
+    worker.assignedPlateId = null
     worker.status = 'RETURNING'
-    worker.targetPosition = { x: WAITER_HOME.x, y: WAITER_HOME.y }
-  }
-
-  // Find the best unassigned WAITING customer
-  private findCustomer(targeted: Set<string>): string | null {
-    const waiting = customerSystem.customers.filter(
-      (c) => c.status === 'WAITING' && c.canBeServed && !targeted.has(c.id),
-    )
-    if (waiting.length === 0) return null
-
-    if (this.prioritizeLowestPatience) {
-      waiting.sort((a, b) => a.patienceTimer - b.patienceTimer)
-    }
-
-    return waiting[0]!.id
+    worker.targetPosition = { ...WAITER_HOME }
   }
 
   get isActive(): boolean {

@@ -113,12 +113,17 @@ export interface GameSave {
   // MBW-173: Track which tutorial popups have been shown (so they don't repeat)
   shownTutorials: string[]
 
+  // Food & Kitchen
+  kitchen: {
+    ovensOwned: number  // 1 default, up to 3 via shop upgrades
+  }
+
   // Meta
   lastSavedAt: number
   version: number
 }
 
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export const initialGameSave: GameSave = {
   dayNumber: 1,
@@ -169,6 +174,9 @@ export const initialGameSave: GameSave = {
     weeklyRevenue: 0,
   },
   shownTutorials: [],
+  kitchen: {
+    ovensOwned: 1,
+  },
   lastSavedAt: 0,
   version: SAVE_VERSION,
 }

@@ -18,10 +18,14 @@ import { brawlSystem } from '../engine/systems/brawlSystem'
 import { securitySystem } from '../engine/systems/securitySystem'
 import { cleaningSystem } from '../engine/systems/cleaningSystem'
 import { entertainerSystem } from '../engine/systems/entertainerSystem'
-import { waiterSystem } from '../engine/systems/waiterSystem'
 import { customerSystem } from '../engine/systems/customerSystem'
 import { kingsTraySystem } from '../engine/systems/kingsTraySystem'
+import { kitchenSystem } from '../engine/systems/kitchenSystem'
+import { chefSystem } from '../engine/systems/chefSystem'
+import { waiterSystem } from '../engine/systems/waiterSystem'
+import { kitchenRenderer } from '../engine/renderer/kitchenRenderer'
 import { achievementSystem } from '../engine/systems/achievementSystem'
+import { FOOD_UNLOCK_DAY } from '../config/food'
 import { AchievementToast } from '../components/AchievementToast'
 import { PowerupBar } from '../components/PowerupBar'
 import { getUnlockedDrinks } from '../config/drinks'
@@ -167,10 +171,17 @@ export function DayScreen() {
       if (save.upgrades['stage']) {
         entertainerSystem.init(pixiApp.app, save) // MBW-116
       }
-      // MBW-182: Waiter NPC
-      const waiterTier = save.upgrades['waiter']?.tier ?? 0
-      if (waiterTier > 0) {
-        waiterSystem.init(pixiApp.app, waiterTier as 1 | 2 | 3)
+
+      // Food: kitchen renderer + NPC systems
+      const foodUnlocked = save.dayNumber >= FOOD_UNLOCK_DAY
+      const ovensOwned = save.kitchen?.ovensOwned ?? 1
+      kitchenRenderer.init(pixiApp.app, ovensOwned, foodUnlocked)
+      if (foodUnlocked) {
+        kitchenSystem.init(ovensOwned)
+        const chefTier = (save.upgrades['chef']?.tier ?? 0) as 0 | 1 | 2 | 3
+        if (chefTier > 0) chefSystem.init(pixiApp.app, chefTier as 1 | 2 | 3)
+        const waiterTier = (save.upgrades['waiter']?.tier ?? 0) as 0 | 1 | 2 | 3
+        if (waiterTier > 0) waiterSystem.init(pixiApp.app, waiterTier as 1 | 2 | 3)
       }
     })
 
@@ -183,6 +194,9 @@ export function DayScreen() {
       securitySystem.destroyGraphics()
       entertainerSystem.destroy()
       waiterSystem.destroy()
+      chefSystem.destroy()
+      kitchenSystem.destroy()
+      kitchenRenderer.destroy()
       customerRenderer.destroy()
       barScene.destroy()
       pixiApp.destroy()

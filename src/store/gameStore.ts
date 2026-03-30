@@ -50,6 +50,7 @@ interface GameState {
 
   // MBW-NEW: Bar Finances actions
   consumeSupply: (drinkId: string) => number                                             // returns new remaining
+  consumeIngredient: () => number                                                        // returns new remaining (ingredients)
   restockDrink: (drinkId: string, qty: number, totalCost: number) => boolean
   resetDailySupply: () => void                                                            // reset usedToday at day start
   addWeeklyRevenue: (amount: number) => void
@@ -115,11 +116,14 @@ export const useGameStore = create<GameState>()(
 
           if (state.gameSave.coins < tierConfig.cost) return state // can't afford
 
-          // Apply extra_capacity immediately to barCapacity
+          // Apply extra_capacity immediately to barCapacity; extra_oven to kitchen.ovensOwned
           let barCapacity = state.gameSave.barCapacity
+          let ovensOwned = state.gameSave.kitchen?.ovensOwned ?? 1
           for (const effect of tierConfig.effects) {
             if (effect.type === 'extra_capacity') {
               barCapacity += effect.value
+            } else if (effect.type === 'extra_oven') {
+              ovensOwned = effect.value  // value is the total oven count after purchase
             }
           }
 
@@ -129,6 +133,7 @@ export const useGameStore = create<GameState>()(
               ...state.gameSave,
               coins: state.gameSave.coins - tierConfig.cost,
               barCapacity,
+              kitchen: { ...(state.gameSave.kitchen ?? { ovensOwned: 1 }), ovensOwned },
               upgrades: {
                 ...state.gameSave.upgrades,
                 [upgradeId]: { tier: nextTier, purchasedOnDay: state.gameSave.dayNumber - 1 },
@@ -341,6 +346,34 @@ export const useGameStore = create<GameState>()(
         return result
       },
       // MBW-NEW: Bar Finances — supply tracking
+
+      consumeIngredient: () => {
+        let newRemaining = 0
+        set((state) => {
+          const current = state.gameSave.finances.supplies['ingredients']
+          if (!current || current.remaining <= 0) return state
+          newRemaining = current.remaining - 1
+          return {
+            gameSave: {
+              ...state.gameSave,
+              finances: {
+                ...state.gameSave.finances,
+                supplies: {
+                  ...state.gameSave.finances.supplies,
+                  ingredients: {
+                    ...current,
+                    remaining: newRemaining,
+                    usedToday: current.usedToday + 1,
+                    totalUsedThisWeek: current.totalUsedThisWeek + 1,
+                  },
+                },
+              },
+              lastSavedAt: Date.now(),
+            },
+          }
+        })
+        return newRemaining
+      },
 
       consumeSupply: (drinkId: string) => {
         let newRemaining = 0
@@ -760,6 +793,22 @@ export const useGameStore = create<GameState>()(
               weeklyBillHistory: [],
               suppliesSpentThisWeek: 0,
               weeklyRevenue: 0,
+            }
+          }
+        }
+
+        if (version < 6) {
+          // Food & Kitchen: add kitchen save state and ingredient supply slot
+          const save = ps.gameSave as GameSave
+          if (!save.kitchen) {
+            save.kitchen = { ovensOwned: 1 }
+          }
+          if (save.finances && !save.finances.supplies['ingredients']) {
+            save.finances.supplies['ingredients'] = {
+              remaining: 0,
+              usedToday: 0,
+              totalUsedThisWeek: 0,
+              totalSpentThisWeek: 0,
             }
           }
         }

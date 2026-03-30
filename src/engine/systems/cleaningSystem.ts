@@ -61,10 +61,13 @@ class CleaningSystem {
     resetMessIdCounter()
     // MBW-166: Glasses only appear on departure, not immediately after serving
     eventDispatcher.on('CUSTOMER_LEFT', this.handleCustomerLeft)
+    // Food: dirty plate spawns at table when customer finishes eating (still seated)
+    eventDispatcher.on('PLATE_EMPTY', this.handlePlateEmpty)
   }
 
   destroy(): void {
     eventDispatcher.off('CUSTOMER_LEFT', this.handleCustomerLeft)
+    eventDispatcher.off('PLATE_EMPTY', this.handlePlateEmpty)
     this.stage?.destroy({ children: true })
     this.stage = null
     this.messDisplays.clear()
@@ -141,6 +144,23 @@ class CleaningSystem {
     }
 
     this.spawnMess(glassX, glassY, customer.seatId, onCounter, seat.tableId)
+  }
+
+  // Food: dirty plate appears on table immediately after eating (customer still seated)
+  private handlePlateEmpty = ({ customerId }: { customerId: string }): void => {
+    if (this.messes.length >= MESS.maxMesses) return
+    const customer = customerSystem.customers.find((c) => c.id === customerId)
+    if (!customer) return
+    const seat = SEATS_BY_ID[customer.seatId]
+    if (!seat || seat.type !== 'table_chair') return  // plates only on tables
+
+    const table = TABLES.find((t) => t.id === seat.tableId)
+    const existingAtTable = this.messes.filter((m) => m.tableId === seat.tableId).length
+    const sign = existingAtTable % 2 === 0 ? 1 : -1
+    const magnitude = Math.floor((existingAtTable + 1) / 2) * 12
+    const x = (table ? table.position.x : seat.position.x) + sign * magnitude
+    const y = table ? table.position.y : seat.position.y - 20
+    this.spawnMess(x, y, customer.seatId, false, seat.tableId ?? null)
   }
 
   private spawnMess(x: number, y: number, seatId: string | null = null, onCounter = false, tableId: string | null = null): void {

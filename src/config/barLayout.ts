@@ -106,3 +106,28 @@ export const BAR_TIP_POSITION = { x: 187, y: 160 }
 // MBW-161: Stage — bottom-left of floor, clear of table-3 and the doorway
 export const STAGE_POSITION = { x: 65, y: 565 } as const
 export const STAGE_AREA = { width: 80, height: 30 } as const
+
+// ─── Kitchen & Service Counter (Food & Kitchen system) ───────────────────────
+// Kitchen sits above the bar counter (y=0 to BAR_COUNTER_TOP).
+// Service counter is on the right side, spanning kitchen to bar bottom.
+export const KITCHEN_TOP = 0
+export const KITCHEN_BOTTOM = BAR_COUNTER_TOP  // 60
+export const KITCHEN_CENTER_Y = 30
+
+// Up to 3 oven slots in the kitchen area
+export const OVEN_SLOT_POSITIONS = [
+  { x: 65,  y: KITCHEN_CENTER_Y },
+  { x: 168, y: KITCHEN_CENTER_Y },
+  { x: 271, y: KITCHEN_CENTER_Y },
+] as const
+
+// Service counter — right strip x=328..375, spanning y=0..BAR_COUNTER_BOTTOM
+export const SERVICE_COUNTER_LEFT = 328
+export const SERVICE_COUNTER_WIDTH = CANVAS_WIDTH - SERVICE_COUNTER_LEFT  // 47
+
+// Plate slots on the service counter (3 total)
+export const PLATE_SLOT_POSITIONS = [
+  { x: 351, y: 16 },
+  { x: 351, y: 75 },
+  { x: 351, y: 128 },
+] as const

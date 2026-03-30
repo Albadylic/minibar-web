@@ -36,8 +36,10 @@ import {
   MAX_LIKELIHOOD,
   computeNewLevel,
 } from '../config/entertainers'
-import { waiterSystem } from './systems/waiterSystem'
 import { kingsTraySystem } from './systems/kingsTraySystem'
+import { kitchenSystem } from './systems/kitchenSystem'
+import { chefSystem } from './systems/chefSystem'
+import { waiterSystem } from './systems/waiterSystem'
 import { resetBrawlIdCounter } from '../entities/brawl'
 import type { EventType } from '../types/day'
 import type { PowerupType } from '../types/achievements'
@@ -212,6 +214,7 @@ class GameLoop {
     this.serveAllUsedToday = false
 
     customerSystem.reset()
+    customerSystem.setDayNumber(dayConfig.dayNumber)
     brawlSystem.reset()
     resetBrawlIdCounter()
 
@@ -303,10 +306,12 @@ class GameLoop {
     cleaningSystem.tick(dt)
     // MBW-116: Advance entertainer walk animation
     entertainerSystem.tick(dt)
-    // MBW-182: Advance waiter NPC pathfinding
-    waiterSystem.update(dt)
     // MBW-109: Advance king's tray countdown
     kingsTraySystem.tick(dt)
+    // Food: tick kitchen (oven timers, patience), chef NPC, waiter NPC
+    kitchenSystem.tick(dt)
+    chefSystem.tick(dt)
+    waiterSystem.update(dt)
 
     useHudStore.setState({
       timeRemaining,

@@ -14,7 +14,9 @@ export interface UpgradeEffect {
     | 'reduce_drunk_spawn'  // MBW-181: Doorman tier 1 — fewer drunks enter (value = spawn multiplier)
     | 'filter_hooligan'     // MBW-181: Doorman tier 2 — chance to turn away hooligans at door (value = probability)
     | 'rich_patience_boost' // MBW-181: Doorman tier 3 — rich clientele patience boost on entry (value = multiplier)
-    | 'waiter'              // MBW-182: Waiter NPC — autonomous drink serving (value = tier: 1/2/3)
+    | 'chef'               // Food: autonomous kitchen queue management (value = tier 1/2/3)
+    | 'waiter'             // Food: autonomous food delivery from service counter to tables (value = tier 1/2/3)
+    | 'extra_oven'         // Food: adds one cooking station (value = total ovens after purchase)
   value: number
 }
 
@@ -27,7 +29,7 @@ export interface UpgradeTier {
 export interface UpgradeConfig {
   id: string
   name: string
-  category: 'seating' | 'ambience' | 'service' | 'staff' | 'environment'
+  category: 'seating' | 'ambience' | 'service' | 'staff' | 'environment' | 'kitchen'
   maxTier: number
   tiers: UpgradeTier[]
   // MBW-178: Earliest day this upgrade appears in the shop rotation
@@ -350,31 +352,82 @@ const DOORMAN_UPGRADE: UpgradeConfig = {
   placeholderColor: 0x223322,
 }
 
-// MBW-182: Waiter — autonomous NPC that fetches and delivers drinks to waiting customers
+// Food: Extra Oven — second and third cooking stations (kitchen category, one tier each)
+const EXTRA_OVEN_UPGRADE: UpgradeConfig = {
+  id: 'extra_ovens',
+  name: 'Extra Oven',
+  category: 'kitchen',
+  maxTier: 2,
+  minDay: 15,
+  tiers: [
+    {
+      cost: 400,
+      effects: [{ type: 'extra_oven', value: 2 }],
+      description: 'Second oven — two items can cook simultaneously.',
+    },
+    {
+      cost: 700,
+      effects: [{ type: 'extra_oven', value: 3 }],
+      description: 'Third oven — three items can cook simultaneously.',
+    },
+  ],
+  visualPlacement: { x: 168, y: 30 },
+  placeholderColor: 0x884422,
+}
+
+// Food: Chef — autonomous kitchen queue management NPC
+const CHEF_UPGRADE: UpgradeConfig = {
+  id: 'chef',
+  name: 'Chef',
+  category: 'staff',
+  maxTier: 3,
+  minDay: 15,
+  tiers: [
+    {
+      cost: 350,
+      effects: [{ type: 'chef', value: 1 }],
+      description: 'Auto-moves orders from the queue onto available ovens.',
+    },
+    {
+      cost: 550,
+      effects: [{ type: 'chef', value: 2 }],
+      description: 'Faster dispatch. Prioritises orders closest to patience expiry.',
+    },
+    {
+      cost: 800,
+      effects: [{ type: 'chef', value: 3 }],
+      description: 'Also auto-moves cooked food from ovens to the service counter.',
+    },
+  ],
+  visualPlacement: { x: 271, y: 30 },
+  placeholderColor: 0xffffff,
+}
+
+// Food: Waiter — delivers plated food from service counter to customers
 const WAITER_UPGRADE: UpgradeConfig = {
   id: 'waiter',
   name: 'Waiter',
   category: 'staff',
   maxTier: 3,
-  minDay: 8,
+  minDay: 15,
   tiers: [
     {
       cost: 300,
       effects: [{ type: 'waiter', value: 1 }],
-      description: 'A waiter serves 1 customer at a time. Walks bar → table → back.',
+      description: 'Delivers food to 1 table at a time. Food delivery only — drinks remain player-served.',
     },
     {
       cost: 500,
       effects: [{ type: 'waiter', value: 2 }],
-      description: 'Handles 2 orders simultaneously at faster walking speed.',
+      description: 'Handles 2 deliveries simultaneously at faster walking speed.',
     },
     {
       cost: 750,
       effects: [{ type: 'waiter', value: 3 }],
-      description: 'Handles 3 orders. Fastest speed. Prioritises lowest-patience customers.',
+      description: 'Handles 3 deliveries. Fastest speed. Prioritises closest-to-expiry customers.',
     },
   ],
-  visualPlacement: { x: 344, y: 570 },
+  visualPlacement: { x: 351, y: 75 },
   placeholderColor: 0x44a899,
 }
 
@@ -388,6 +441,8 @@ UPGRADES.push(
   STAGE_UPGRADE,
   JUKEBOX_UPGRADE,
   DOORMAN_UPGRADE,
+  EXTRA_OVEN_UPGRADE,
+  CHEF_UPGRADE,
   WAITER_UPGRADE,
 )
 

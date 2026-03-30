@@ -11,7 +11,11 @@ export type CustomerStatus =
   | 'SERVED_LINGERING'// served, sitting idle
   | 'REORDERING'      // linger expired, ordering again → WAITING
   | 'BRAWLING'        // MBW-78: hooligan patience expired — triggers brawl mechanic
+  | 'EATING'          // Food: eating their meal after delivery
   | 'LEAVING'         // walking seat → doorway, then removed
+
+export type FoodOrderStage = 'ORDERING' | 'IN_QUEUE' | 'COOKING' | 'PLATED' | 'EATING'
+export type WaitingIndicator = 'greyed' | 'ready_pulse' | 'none'
 
 export interface CustomerEntity {
   id: string
@@ -34,6 +38,17 @@ export interface CustomerEntity {
   // MBW-NEW: Regular customer — always leaves a review, rendered green
   isRegular: boolean
   regularId?: string      // matches RegularConfig.id (e.g. 'bjorn_blacksmith')
+
+  // Food order state — null when ordering/drinking only
+  currentOrderType: 'drink' | 'food'
+  foodOrderId: string | null        // matches FoodOrder.id in kitchenSystem
+  foodOrderFoodId: string | null    // which food item ('bread' | 'stew' | 'roast')
+  foodOrderStage: FoodOrderStage | null
+  foodPatienceTimer: number         // Window 1 countdown (ORDERING stage only)
+  foodPatienceMax: number
+  waitingIndicator: WaitingIndicator
+  eatProgress: number               // 0→1 while EATING
+  eatDuration: number               // total eat time for this order
 }
 
 let _nextId = 0

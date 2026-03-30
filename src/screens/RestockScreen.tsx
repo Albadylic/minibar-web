@@ -8,6 +8,7 @@ import { DRINKS_BY_ID } from '../config/drinks'
 import { FINANCES_CONFIG, computeBulkCost, type BulkTierKey } from '../config/finances'
 import { PRE_DAY_POWERUPS } from '../config/powerups'
 import type { PowerupType } from '../types/achievements'
+import { FOOD_UNLOCK_DAY, INGREDIENT_UNIT_COST } from '../config/food'
 
 interface PendingOrder {
   qty: number
@@ -23,9 +24,11 @@ export function RestockScreen() {
   )
 
   function addToCart(drinkId: string, tier: BulkTierKey) {
-    const drink = DRINKS_BY_ID[drinkId]
-    if (!drink) return
-    const cost = computeBulkCost(drink.supplyUnitCost, tier)
+    const unitCost = drinkId === 'ingredients'
+      ? INGREDIENT_UNIT_COST
+      : (DRINKS_BY_ID[drinkId]?.supplyUnitCost ?? null)
+    if (unitCost === null) return
+    const cost = computeBulkCost(unitCost, tier)
     const qty = FINANCES_CONFIG.BULK_TIERS[tier].quantity
     setPending((prev) => ({
       ...prev,
@@ -63,6 +66,12 @@ export function RestockScreen() {
     navigate()
   }
 
+  const foodUnlocked = gameSave.dayNumber >= FOOD_UNLOCK_DAY
+  const ingredientSupply = gameSave.finances.supplies['ingredients']
+  const ingredientsInStock = ingredientSupply?.remaining ?? 0
+  const ingredientsUsedYesterday = ingredientSupply?.usedToday ?? 0
+  const ingredientCartOrder = pending['ingredients']
+
   // Days until weekly bill
   const daysUntilBill = 7 - ((gameSave.dayNumber - 1) % 7) || 7
 
@@ -72,6 +81,42 @@ export function RestockScreen() {
       <p className="restock-subtitle">Day {gameSave.dayNumber} — 🪙 {gameSave.coins} coins</p>
 
       <div className="restock-drink-list">
+        {/* Food: Ingredients row — shown from Day 15 */}
+        {foodUnlocked && (
+          <div className="restock-drink-row">
+            <div className="restock-drink-header">
+              <span className="restock-drink-name">🥕 Ingredients</span>
+              <span className="restock-drink-stock">
+                {ingredientsInStock} portions
+                {ingredientsUsedYesterday > 0 && <span className="restock-used"> · {ingredientsUsedYesterday} used yesterday</span>}
+              </span>
+            </div>
+            {ingredientCartOrder && (
+              <div className="restock-cart-row">
+                <span className="restock-cart-label">+{ingredientCartOrder.qty} portions — 🪙{ingredientCartOrder.cost}</span>
+                <button className="restock-clear-btn" onClick={() => removeFromCart('ingredients')}>✕</button>
+              </div>
+            )}
+            <div className="restock-bulk-btns">
+              {(['small', 'medium', 'large'] as BulkTierKey[]).map((tier) => {
+                const { quantity, discount } = FINANCES_CONFIG.BULK_TIERS[tier]
+                const cost = computeBulkCost(INGREDIENT_UNIT_COST, tier)
+                return (
+                  <button
+                    key={tier}
+                    className={`restock-bulk-btn restock-bulk-${tier}`}
+                    onClick={() => addToCart('ingredients', tier)}
+                  >
+                    <span className="bulk-qty">{quantity}u</span>
+                    <span className="bulk-cost">🪙{cost}</span>
+                    {discount > 0 && <span className="bulk-discount">{Math.round(discount * 100)}% off</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {gameSave.unlockedDrinks.map((drinkId) => {
           const drink = DRINKS_BY_ID[drinkId]
           if (!drink) return null

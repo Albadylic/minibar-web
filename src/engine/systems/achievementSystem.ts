@@ -10,7 +10,7 @@ import { cleaningSystem } from './cleaningSystem'
 import { gameLoop } from '../gameLoop'
 import type { GameSave } from '../../types/game'
 
-const STAFF_IDS = ['bouncer', 'cleaner', 'doorman', 'waiter'] as const
+const STAFF_IDS = ['bouncer', 'cleaner', 'doorman'] as const
 
 class AchievementSystem {
   // Day-local counters — reset on init()

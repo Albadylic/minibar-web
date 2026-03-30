@@ -36,6 +36,9 @@ class DrinkServingSystem {
       return
     }
 
+    // Food: skip customers who are ordering food — kitchenSystem handles them
+    if (customer.currentOrderType === 'food' && customer.foodOrderStage === 'ORDERING') return
+
     const selectedDrinkId = gameLoop.selectedDrink
     if (!selectedDrinkId) return
     if (customer.status !== 'WAITING') return

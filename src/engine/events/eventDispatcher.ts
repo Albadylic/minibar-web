@@ -53,6 +53,24 @@ export type GameEventMap = {
   SUPPLY_DEPLETED: { drinkId: string }
   UPGRADE_DAMAGED: { upgradeId: string; newTier: number; wasInsured: boolean }
   BURGLARY_OCCURRED: { upgradeId: string; covered: boolean }
+
+  // Food & Kitchen events
+  FOOD_ORDER_PLACED: { customerId: string; foodId: string }
+  FOOD_ORDER_TAKEN: { customerId: string; foodId: string; orderId: string }
+  FOOD_COOKING_STARTED: { orderId: string; ovenId: string }
+  FOOD_READY: { orderId: string; ovenId: string }
+  FOOD_OVERDONE: { orderId: string; ovenId: string }
+  FOOD_BURNT: { orderId: string; ovenId: string }
+  FOOD_PLATED: { orderId: string; plateId: string }
+  FOOD_DELIVERED: { orderId: string; customerId: string; quality: 'ready' | 'overdone'; coinsEarned: number }
+  FOOD_WASTED: { orderId: string; reason: 'burnt' | 'patience_expired' | 'customer_left' }
+  CUSTOMER_EATING: { customerId: string; foodId: string }
+  PLATE_EMPTY: { customerId: string }
+  INGREDIENT_DEPLETED: Record<string, never>
+  // Kitchen interaction inputs (emitted by React queue panel and PixiJS oven/plate clicks)
+  QUEUE_ORDER_CLICKED: { orderId: string }
+  OVEN_CLICKED: { ovenId: string }
+  PLATE_SLOT_CLICKED: { plateId: string }
 }
 
 type EventHandler<T> = (payload: T) => void

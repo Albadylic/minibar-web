@@ -12,6 +12,19 @@ export interface TipPrompt {
   options: [number, number, number, number]  // Generous, Adequate, Poor, Refuse amounts
 }
 
+// Kitchen order queue item shown in the React order queue panel
+export interface KitchenQueueItem {
+  orderId: string
+  foodId: string
+  patienceRemaining: number
+  patienceMax: number
+}
+
+export type KitchenSelectionType =
+  | { type: 'queue_order'; orderId: string }
+  | { type: 'oven_food'; ovenId: string }
+  | { type: 'plate'; plateId: string }
+
 interface HudState {
   timeRemaining: number
   phase: DayPhase
@@ -27,6 +40,13 @@ interface HudState {
   // MBW-NEW: Powerup transient state
   inGamePowerupUsedToday: Record<string, boolean>  // reset in gameLoop.start()
   pendingPreDayPowerups: string[]                  // set in EventNoticeScreen, consumed by DayScreen
+
+  // Food & Kitchen HUD
+  kitchenQueue: KitchenQueueItem[]      // top 3 shown; rest folded
+  kitchenQueueOverflow: number          // count of orders beyond the first 3
+  kitchenSelection: KitchenSelectionType | null
+  ingredientsRemaining: number
+  foodUnlocked: boolean
 }
 
 export const useHudStore = create<HudState>()(() => ({
@@ -41,4 +61,9 @@ export const useHudStore = create<HudState>()(() => ({
   pendingAchievementSummary: null,
   inGamePowerupUsedToday: {},
   pendingPreDayPowerups: [],
+  kitchenQueue: [],
+  kitchenQueueOverflow: 0,
+  kitchenSelection: null,
+  ingredientsRemaining: 0,
+  foodUnlocked: false,
 }))
